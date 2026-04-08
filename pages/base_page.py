@@ -27,11 +27,18 @@ class BasePage:
             raise AssertionError(f"FAIL: 元素 {locator} 在 {self.timeout} 秒內無法點擊")
 
     # 3. 狀態判斷：元素是否顯示 (安全捕捉，禁用裸 except)
-    def is_element_displayed(self, locator):
+    def is_element_displayed(self, locator, timeout=None):
+        """
+        判斷元素是否顯示。可傳入較短的 timeout 以避免不必要的長時間等待。
+        例如檢查偶發彈窗時：is_element_displayed(loc, timeout=2)
+        """
+        wait_time = timeout if timeout is not None else self.timeout
         try:
-            self.wait_until_visible(locator)
+            WebDriverWait(self.driver, wait_time).until(
+                EC.visibility_of_element_located(locator)
+            )
             return True
-        except AssertionError:
+        except TimeoutException:
             return False
 
     # 4. 安全點擊機制 (根除 Flaky Test)
@@ -62,3 +69,42 @@ class BasePage:
             safe_wait.until(_click_condition)
         except TimeoutException:
             raise AssertionError(f"FAIL: 元素 {locator} 無法點擊，可能一直被遮擋或動畫未結束")
+
+    # ════════════════════════════════════════════════
+    # 補充：為支援 HomePage 與其他頁面補齊的安全封裝方法
+    # ════════════════════════════════════════════════
+
+    # 5. 安全獲取文字
+    def get_text(self, locator):
+        """等待元素顯示後獲取其文本，自動去除前後空白，並防禦 DOM 刷新"""
+        element = self.wait_until_visible(locator)
+        try:
+            return element.text.strip()
+        except StaleElementReferenceException:
+            # 若發生 Stale，重新抓取一次確保穩定
+            element = self.wait_until_visible(locator)
+            return element.text.strip()
+
+    # 6. 安全獲取屬性值
+    def get_attribute(self, locator, attribute):
+        """等待元素存在後獲取指定屬性值"""
+        try:
+            # 屬性獲取通常只需要存在於 DOM 中即可 (presence)，不需要顯示 (visibility)
+            element = self.wait.until(EC.presence_of_element_located(locator))
+            return element.get_attribute(attribute)
+        except TimeoutException:
+            raise AssertionError(f"FAIL: 元素 {locator} 在 {self.timeout} 秒內未出現在 DOM 中，無法獲取屬性 {attribute}")
+        except StaleElementReferenceException:
+            element = self.wait.until(EC.presence_of_element_located(locator))
+            return element.get_attribute(attribute)
+
+    # 7. 安全獲取多個元素 (列表)
+    def find_elements(self, locator):
+        """
+        等待至少一個符合條件的元素出現在 DOM 中，並回傳列表。
+        若超時未找到，則回傳空列表 (符合 Selenium 原生行為，且不讓測試崩潰)。
+        """
+        try:
+            return self.wait.until(EC.presence_of_all_elements_located(locator))
+        except TimeoutException:
+            return []

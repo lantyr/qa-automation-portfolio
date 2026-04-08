@@ -52,13 +52,22 @@ class TestPCCustomerService:
             self.home.wait_until_clickable(HomePage.FOOTER_CS_LINK)
 
         with allure.step("3. 點擊「客服中心」入口按鈕，驗證成功進入客服中心頁面並截圖"):
-            original_url = self.driver.current_url
-            self.home.click_footer_customer_service()
-
             from selenium.webdriver.support.ui import WebDriverWait
             from selenium.webdriver.support import expected_conditions as EC
+
+            original_handles = self.driver.window_handles
+            self.home.click_footer_customer_service()
+
+            # 客服中心連結使用 target="_blank"，等待新分頁開啟後切換
             WebDriverWait(self.driver, _TIMEOUT).until(
-                EC.url_changes(original_url)
+                EC.number_of_windows_to_be(len(original_handles) + 1)
+            )
+            new_handle = [h for h in self.driver.window_handles
+                          if h not in original_handles][0]
+            self.driver.switch_to.window(new_handle)
+
+            WebDriverWait(self.driver, _TIMEOUT).until(
+                lambda d: d.execute_script("return document.readyState") == "complete"
             )
 
             current_url = self.driver.current_url

@@ -1,4 +1,8 @@
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.common.exceptions import TimeoutException
 from pages.base_page import BasePage
 import os
 
@@ -25,33 +29,55 @@ class HomePage(BasePage):
     CHATBOT_WINDOW_TITLE = (By.XPATH, "//h3[contains(text(), '遊戲橘子客服小幫手')]")
 
     # --- 登入 / 登出 ---
-    # ⚠️ 需依實際 DOM 調整
-    LOGIN_BTN = (By.XPATH,
-        "//*[@id='BF_btnCoLogin'] | //a[contains(@class,'co-login')] | "
-        "//a[normalize-space()='登入' and not(ancestor::footer)]"
-    )
-    LOGOUT_BTN = (By.XPATH,
-        "//*[@id='BF_btnLogout'] | //a[contains(@class,'logout') or normalize-space()='登出']"
-    )
+    LOGIN_BTN  = (By.ID, "BF_anchorLoginBtn")
+    LOGOUT_BTN = (By.ID, "BF_btnLogout")
 
     # --- GASH 點數子選單 ---
-    # ⚠️ 需依實際 DOM 調整 - 右下角「點數」展開按鈕與子選單
-    REMAINING_POINTS_TOGGLE = (By.XPATH,
-        "//*[contains(@id,'GashSubMenuLink') or contains(@id,'GashToggle')] | "
-        "//*[@id='BF_divGashSubMenu']/preceding-sibling::a[1]"
+    # BF_btnGash：右下角「我的錢包/儲值」按鈕，點擊後展開 BF_divGashSubMenu
+    REMAINING_POINTS_TOGGLE = (By.ID, "BF_btnGash")
+    GASH_SUBMENU             = (By.ID, "BF_divGashSubMenu")
+    TOPUP_PURCHASE_LINK      = (By.XPATH,
+        "//*[@id='BF_divGashSubMenu']//li[contains(.,'儲值與購點')]"
     )
-    GASH_SUBMENU = (By.ID, "BF_divGashSubMenu")
-    TOPUP_PURCHASE_LINK = (By.XPATH,
-        "//*[@id='BF_divGashSubMenu']//a[contains(.,'儲值與購點') or contains(.,'購點')]"
-    )
-
+    YOUTUBE_IFRAME = (By.XPATH, "//iframe[contains(@src, 'youtube')]")
+    YT_LARGE_PLAY_BTN = (By.CSS_SELECTOR, "button.ytmCuedOverlayPlayButton, button.ytp-large-play-button")
     # --- 頁尾連結 ---
-    # ⚠️ 需依實際 DOM 調整
-    FOOTER_CS_LINK = (By.XPATH,
-        "//footer//a[contains(.,'客服中心')] | "
-        "//div[contains(@class,'footer') or contains(@id,'footer')]//a[contains(.,'客服中心')]"
-    )
+    # footer.js 產生 <div id="divFooter">，CS 連結 href 指向 csp.beanfun.com
+    FOOTER_CS_LINK = (By.CSS_SELECTOR, "#divFooter a[href*='csp.beanfun.com']")
+    def scroll_to_youtube_video(self):
+        """捲動至 YouTube 影片 iframe (嚴守 Rule 6: 避免 JS，使用 ActionChains)"""
+        iframe_el = self.wait.until(EC.presence_of_element_located(self.YOUTUBE_IFRAME))
+        ActionChains(self.driver).scroll_to_element(iframe_el).perform()
+        return self.wait_until_visible(self.YOUTUBE_IFRAME)
 
+    def play_youtube_video(self):
+        """切換至 iframe 並點擊影片大播放鍵"""
+        self.scroll_to_youtube_video()
+        iframe_el = self.wait_until_visible(self.YOUTUBE_IFRAME)
+        
+        # 必須切換 context 才能操作 iframe 內的元素
+        self.driver.switch_to.frame(iframe_el)
+        try:
+            print("👉 嘗試點擊 YouTube 播放按鈕...")
+            # 使用你 BasePage 封裝的安全點擊 (忽略遮擋與 Stale)
+            self.click_element_safely(self.YT_LARGE_PLAY_BTN)
+        finally:
+            # 💡 確保無論點擊是否發生異常，都強制切回主畫面，防止污染後續測試 (Rule 8)
+            self.driver.switch_to.default_content()
+
+    def verify_youtube_is_playing(self):
+        """斷言驗證：大型播放鍵消失"""
+        iframe_el = self.wait_until_visible(self.YOUTUBE_IFRAME)
+        self.driver.switch_to.frame(iframe_el)
+        try:
+            WebDriverWait(self.driver, 10).until(
+                EC.invisibility_of_element_located(self.YT_LARGE_PLAY_BTN)
+            )
+            return True
+        except Exception as e:
+            raise AssertionError(f"FAIL: 點擊後播放按鈕依然存在，影片未能執行。細節: {e}")
+        finally:
+            self.driver.switch_to.default_content()
     def __init__(self, driver):
         super().__init__(driver)
         # 從環境變數讀取，若無則給予預設值 (遵守 Rule 8)
@@ -154,11 +180,16 @@ class HomePage(BasePage):
     def open_topup_popup(self):
         """
         展開 GASH 點數子選單，再點擊「儲值與購點」進入彈窗。
-        ⚠️ REMAINING_POINTS_TOGGLE / TOPUP_PURCHASE_LINK 需依實際 DOM 調整。
+        點擊後等待 JS alert（資安提示）出現並接受，最多等 5 秒。
         """
         self.click_element_safely(self.REMAINING_POINTS_TOGGLE)
         self.wait_until_visible(self.GASH_SUBMENU)
         self.click_element_safely(self.TOPUP_PURCHASE_LINK)
+        try:
+            WebDriverWait(self.driver, 5).until(EC.alert_is_present())
+            self.driver.switch_to.alert.accept()
+        except TimeoutException:
+            pass
 
     # --- 頁尾 Actions ---
     def scroll_to_footer(self):

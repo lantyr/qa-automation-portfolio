@@ -1,7 +1,7 @@
 {
   "element_timeout": 10,
   "customer_service": {
-    "expected_url_fragment": "cs",
+    "expected_url_fragment": "csp.beanfun.com",
     "expected_title_fragment": "客服"
   }
 }

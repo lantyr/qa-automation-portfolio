@@ -35,8 +35,8 @@ class LoginPage(BasePage):
         
         print("👉 [1/4] 正在填寫初始帳號並點擊登入...")
         old_handles = self.driver.window_handles
-        self.find(self.STEP1_ACCOUNT).send_keys(phone)
-        btn_element = self.find(self.STEP1_BTN)
+        self.wait_until_visible(self.STEP1_ACCOUNT).send_keys(phone)
+        btn_element = self.wait_until_visible(self.STEP1_BTN)
         self.driver.execute_script("arguments[0].click();", btn_element)
         self.wait_and_switch_window(old_handles)
         self.wait_and_switch_window(old_handles)
@@ -55,7 +55,7 @@ class LoginPage(BasePage):
         pwd_el.send_keys(password)
 
         handles_before_login = self.driver.window_handles
-        login_btn = self.find(self.LOGIN_FINAL_BTN)
+        login_btn = self.wait_until_visible(self.LOGIN_FINAL_BTN)
         self.driver.execute_script("arguments[0].click();", login_btn)
         print("🚀 已按下登入...")
 

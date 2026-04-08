@@ -30,7 +30,7 @@ def _log(msg: str) -> None:
         print(msg.encode(enc, errors="replace").decode(enc, errors="replace"))
 
 # 固定一併收件（與 REPORT_RECEIVER_EMAIL 合併、去重）
-_EXTRA_REPORT_RECEIVERS = ("willisshao@gamania.com",)
+_EXTRA_REPORT_RECEIVERS = ()
 
 
 def _parse_receiver_list(raw: str) -> list[str]:

@@ -62,7 +62,17 @@ class TestPCTopupStore:
             self.home.go_to_home()
             self.home.click_login_btn()
             self.login.login_action(account, password)
-            self.login.fill_otp_code(otp)
+            try:
+                self.login.fill_otp_code(otp)
+            except Exception:
+                allure.attach(
+                    self.driver.get_screenshot_as_png(),
+                    name="OTP畫面未出現",
+                    attachment_type=allure.attachment_type.PNG,
+                )
+                pytest.skip(
+                    "beanfun 偵測登入過於頻繁，OTP 驗證頁未出現，請等待數分鐘後重新執行"
+                )
             self.login.click_final_confirm()
             WebDriverWait(self.driver, 20).until(
                 EC.url_contains("beanfun.com")

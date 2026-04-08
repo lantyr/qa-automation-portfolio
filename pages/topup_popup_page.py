@@ -25,20 +25,16 @@ class TopupPopupPage(BasePage):
     # ════════════════════════════════════════════════
 
     # ── 彈窗根容器（主文件 context）─────────────────────────
-    # ⚠️ 需依實際 DOM 調整
+    # floatbox 產生 id="fbContent" 作為彈窗內容容器
     POPUP_ROOT = (By.ID, "fbContent")
 
     # ── 彈窗內部 iframe（功能操作區域）──────────────────────
-    # ⚠️ 需依實際 DOM 調整
-    POPUP_IFRAME = (By.CSS_SELECTOR, "#fbContent iframe")
+    # 彈窗本身即為 iframe，id="fbContent"
+    POPUP_IFRAME = (By.ID, "fbContent")
 
     # ── 關閉按鈕（主文件 context，位於彈窗右上角）───────────
-    # ⚠️ 需依實際 DOM 調整
-    CLOSE_BTN = (By.XPATH,
-        "//a[contains(@class,'btn_close') and ancestor::*[@id='fbContent' "
-        "    or preceding-sibling::*[@id='fbContent']]] | "
-        "//*[@id='fbContent']/following-sibling::*//a[contains(@class,'close')]"
-    )
+    # default.css: #BF_divPopWindow .BF_Header .BF_CloseButton a.popclose
+    CLOSE_BTN = (By.ID, "fbClose")
 
     # ── 防詐騙 OTP 驗證彈窗（iframe context 內，可能出現）───
     # ⚠️ 需依實際 DOM 調整
@@ -52,17 +48,17 @@ class TopupPopupPage(BasePage):
 
     # ── 左側帳號資訊區（iframe context 內）─────────────────
     # ⚠️ 需依實際 DOM 調整
-    REMAINING_POINTS_AREA = (By.XPATH, "//*[contains(text(),'剩餘點數')]")
-    CURRENT_POINTS_AREA   = (By.XPATH, "//*[contains(text(),'當前點數')]")
+    REMAINING_POINTS_AREA = (By.ID, "Remain_point1_lbl_remain_point")
+    CURRENT_POINTS_AREA   = (By.ID, "Remain_point1_lbl_remain_point")
 
     # ── 左側導覽列（iframe context 內）─────────────────────
     # ⚠️ 需依實際 DOM 調整
-    NAV_BUY_POINTS   = (By.XPATH, "//a[normalize-space()='購買點數'   or contains(.,'購買點數')]")
-    NAV_TOPUP_RECORD = (By.XPATH, "//a[normalize-space()='儲值記錄'   or contains(.,'儲值記錄')]")
-    NAV_CONSUMPTION  = (By.XPATH, "//a[normalize-space()='消費記錄'   or contains(.,'消費記錄')]")
-    NAV_GAME_POINTS  = (By.XPATH, "//a[contains(.,'遊戲專用點數')]")
-    NAV_RECENT_TOPUP = (By.XPATH, "//a[contains(.,'最近儲值記錄')]")
-    NAV_BILLING      = (By.XPATH, "//a[normalize-space()='計費設定'   or contains(.,'計費設定')]")
+    NAV_BUY_POINTS   = (By.XPATH, "//div[contains(@class,'menuButton') and contains(.,'購買點數')]")
+    NAV_TOPUP_RECORD = (By.XPATH, "//a[contains(@class,'leftMenuSub') and contains(.,'儲值記錄')]")
+    NAV_CONSUMPTION  = (By.XPATH, "//a[contains(@class,'leftMenuSub') and contains(.,'消費記錄')]")
+    NAV_GAME_POINTS  = (By.XPATH, "//a[contains(@class,'leftMenuSub') and contains(.,'遊戲專用點數')]")
+    NAV_RECENT_TOPUP = (By.XPATH, "//a[contains(@class,'leftMenuSub') and contains(.,'最近的儲值紀錄')]")
+    NAV_BILLING      = (By.XPATH, "//div[contains(@class,'menuButton') and contains(.,'計費設定')]")
 
     # ── 頁面內容載入指標（iframe context 內）────────────────
     # 點擊左側導覽後等待此元素出現代表主內容已載入
@@ -121,8 +117,14 @@ class TopupPopupPage(BasePage):
         )
 
     def click_nav_item(self, locator) -> None:
-        """點擊左側導覽列指定項目。"""
+        """點擊左側導覽列指定項目，並處理可能出現的 JS alert。"""
         self.click_element_safely(locator)
+        try:
+            WebDriverWait(self.driver, 5).until(EC.alert_is_present())
+            self.driver.switch_to.alert.accept()
+            self.switch_to_popup_iframe()
+        except TimeoutException:
+            pass
 
     def assert_page_content_loaded(self, timeout: int = 10) -> None:
         """驗證點擊導覽後右側頁面主要內容已載入。"""
