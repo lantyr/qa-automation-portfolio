@@ -1,0 +1,55 @@
+name: 每日官網自動化測試
+
+on:
+  schedule:
+   - cron: '30 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  run-auto-test:
+    runs-on: self-hosted 
+
+    steps:
+      - name: 0. 清除舊的快取檔案
+        run: |
+          if (Test-Path "C:\Users\ianwu\actions-runner\_work\GamaPass-Automation\GamaPass-Automation\.pytest_cache") {
+            cmd /c "rd /s /q C:\Users\ianwu\actions-runner\_work\GamaPass-Automation\GamaPass-Automation\.pytest_cache"
+          }
+        shell: powershell
+        continue-on-error: true
+
+      - name: 1. 取得最新程式碼
+        uses: actions/checkout@v4
+        with:
+          clean: false
+
+      - name: 3. 安裝 Python 依賴套件
+        run: py -m pip install -r requirements.txt
+
+      - name: 4. 安裝 Allure 命令列工具
+        run: npm install -g allure-commandline --save-dev
+
+      - name: 5. 執行自動化測試 (無頭模式)
+        run: py -m pytest -p no:cacheprovider --clean-alluredir --alluredir=allure-results
+        continue-on-error: true
+        
+      - name: 6. 產生與打包 Allure 報告
+        run: |
+          allure generate allure-results -o allure-report --clean
+          py -m pip install allure-combine
+          allure-combine allure-report
+
+      - name: 7. 寄送測試報告
+        env:
+          REPORT_SENDER_EMAIL: ${{ secrets.REPORT_SENDER_EMAIL }}
+          REPORT_SENDER_PWD: ${{ secrets.REPORT_SENDER_PWD }}
+          REPORT_RECEIVER_EMAIL: ${{ secrets.REPORT_RECEIVER_EMAIL }}
+          PYTHONIOENCODING: utf-8
+        run: py send_report.py
+
+      - name: 8. 上傳測試報告
+        uses: actions/upload-artifact@v4
+        if: always() 
+        with:
+          name: allure-cloud-report
+          path: allure-report/
