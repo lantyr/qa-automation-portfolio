@@ -12,8 +12,9 @@ jobs:
     steps:
       - name: 0. 清除舊的快取檔案
         run: |
-          if (Test-Path "C:\Users\ianwu\actions-runner\_work\GamaPass-Automation\GamaPass-Automation\.pytest_cache") {
-            cmd /c "rd /s /q C:\Users\ianwu\actions-runner\_work\GamaPass-Automation\GamaPass-Automation\.pytest_cache"
+          # 使用相對路徑或內建變數，不要寫死 C:\Users\...
+          if (Test-Path ".pytest_cache") {
+            Remove-Item -Recurse -Force ".pytest_cache"
           }
         shell: powershell
         continue-on-error: true
@@ -30,7 +31,6 @@ jobs:
         run: npm install -g allure-commandline --save-dev
 
       - name: 5. 執行自動化測試 (無頭模式)
-        # 這裡明確指定了三個測試檔案，確保不會跑錯
         run: |
           python -m pytest tests/test_pc_homepage.py tests/test_pc_navbar_states.py tests/test_pc_topup_store.py -p no:cacheprovider --clean-alluredir --alluredir=allure-results
         env:
