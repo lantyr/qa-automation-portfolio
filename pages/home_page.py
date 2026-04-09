@@ -13,16 +13,20 @@ class HomePage(BasePage):
     LOGO = (By.CSS_SELECTOR, "a.logo.oneBrand.bilingual")
     
     # --- Banner 區塊 ---
-    BANNER_IFRAME = ('id', 'actual_iframe_id_here') # ⚠️ 原腳本缺失
+    # 大看板 iframe（主文件 context，無 id，以 class 定位）
+    BANNER_IFRAME    = (By.CSS_SELECTOR, "iframe.banner")
+    # 以下定位器須在切換至 BANNER_IFRAME context 後使用
     BANNER_CONTAINER = (By.CSS_SELECTOR, "ul.bxslider")
     ACTIVE_BANNER_LINK = (By.CSS_SELECTOR, "ul.bxslider li.pic:not([style*='display: none']) a.pic")
-    BANNER_NEXT_BTN = (By.CSS_SELECTOR, "a.slider-r-btn")
+    # 切換按鈕在主文件 context（不在 iframe 內）
+    BANNER_PREV_BTN  = (By.CSS_SELECTOR, "div.slider-l")
+    BANNER_NEXT_BTN  = (By.CSS_SELECTOR, "div.slider-r")
     
     # --- 最新消息區塊 ---
     NEWS_CONTAINER = (By.CSS_SELECTOR, "div.newsitem")
     NEWS_LIST_ITEMS = (By.CSS_SELECTOR, "div.newsitem ul li") # ⚠️ 原腳本缺失
     NEWS_FIRST_ITEM_LINK = (By.CSS_SELECTOR, "div.newsitem ul li:nth-child(1) a")
-    NEWS_FIRST_ITEM_TXT = (By.CSS_SELECTOR, "div.newsitem ul li:nth-child(1) a span.title") # ⚠️ 原腳本缺失
+    NEWS_FIRST_ITEM_TXT = (By.CSS_SELECTOR, "div.newsitem ul li:nth-child(1) a span.txt")
     
     # --- Chatbot 區塊 ---
     CHATBOT_BTN = (By.ID, "gim-bot-tool-button")
@@ -31,6 +35,13 @@ class HomePage(BasePage):
     # --- 登入 / 登出 ---
     LOGIN_BTN  = (By.ID, "BF_anchorLoginBtn")
     LOGOUT_BTN = (By.ID, "BF_btnLogout")
+
+    # --- 右側導覽列按鈕（BF_divRightButtons） ---
+    SIGNUP_BTN = (By.ID, "BF_btnSignup")   # 申請帳號
+    MEMBER_BTN = (By.ID, "BF_btnMember")   # 會員中心
+    BAG_BTN    = (By.ID, "BF_btnBag")      # 雲端背包
+    OPEN_BTN   = (By.ID, "BF_btnOpen")     # 開通服務
+    MISSION_DASHBOARD_FORM = (By.CSS_SELECTOR, "form#form1[action='MissionDashBoard.aspx']")
 
     # --- GASH 點數子選單 ---
     # BF_btnGash：右下角「我的錢包/儲值」按鈕，點擊後展開 BF_divGashSubMenu
@@ -41,6 +52,26 @@ class HomePage(BasePage):
     )
     YOUTUBE_IFRAME = (By.XPATH, "//iframe[contains(@src, 'youtube')]")
     YT_LARGE_PLAY_BTN = (By.CSS_SELECTOR, "button.ytmCuedOverlayPlayButton, button.ytp-large-play-button")
+    # --- 導覽列狀態驗證 ---
+    def assert_logged_out_navbar(self) -> None:
+        """驗證未登入狀態：登入、申請帳號、我的錢包、會員中心 可見；登出 不可見。"""
+        assert self.is_element_displayed(self.LOGIN_BTN), "登入按鈕應可見"
+        assert self.is_element_displayed(self.SIGNUP_BTN), "申請帳號應可見"
+        assert self.is_element_displayed(self.REMAINING_POINTS_TOGGLE), "我的錢包應可見"
+        assert self.is_element_displayed(self.MEMBER_BTN), "會員中心應可見"
+        assert not self.is_element_displayed(self.LOGOUT_BTN, timeout=3), "登出不應可見"
+
+    def assert_logged_in_navbar(self, has_bag: bool = False) -> None:
+        """驗證已登入狀態：登出、剩餘點數、會員中心、開通服務 可見；has_bag 控制是否驗證雲端背包。"""
+        assert self.is_element_displayed(self.LOGOUT_BTN), "登出應可見"
+        assert self.is_element_displayed(self.REMAINING_POINTS_TOGGLE), "剩餘點數應可見"
+        assert self.is_element_displayed(self.MEMBER_BTN), "會員中心應可見"
+        assert self.is_element_displayed(self.OPEN_BTN), "開通服務應可見"
+        if has_bag:
+            assert self.is_element_displayed(self.BAG_BTN), "雲端背包應可見"
+        else:
+            assert not self.is_element_displayed(self.BAG_BTN, timeout=3), "雲端背包不應可見"
+
     # --- 頁尾連結 ---
     # footer.js 產生 <div id="divFooter">，CS 連結 href 指向 csp.beanfun.com
     FOOTER_CS_LINK = (By.CSS_SELECTOR, "#divFooter a[href*='csp.beanfun.com']")
@@ -87,8 +118,9 @@ class HomePage(BasePage):
     # 頁面行為 (Page Actions) - 統一依賴 BasePage 的封裝
     # ════════════════════════════════════════════════
     def go_to_home(self):
-        """導航至首頁並等待 LOGO 出現。"""
+        """導航至首頁並等待 LOGO 出現，若頁面回傳 429 則標記為被鎖定。"""
         self.driver.get(self.url)
+        self.check_for_rate_limit()
         self.wait_until_visible(self.LOGO)
 
     def open_homepage(self):
@@ -143,7 +175,7 @@ class HomePage(BasePage):
         return self.is_displayed(self.CHATBOT_BTN)
 
     def click_chatbot(self):
-        self.click_element(self.CHATBOT_BTN)
+        self.click_element_safely(self.CHATBOT_BTN)
 
     def verify_chatbot_opened(self):
         return self.is_displayed(self.CHATBOT_WINDOW_TITLE)
@@ -167,6 +199,10 @@ class HomePage(BasePage):
             (By.XPATH, "//div[contains(@class,'overlay') or contains(@class,'modal')]"
                        "//a[contains(@class,'close') or contains(@class,'btn_close')]"),
             (By.CSS_SELECTOR, ".modal .close, .popup .close, [id*='Close'][class*='btn']"),
+            # 開通 Gama Pass 廣告彈窗的 X 按鈕（登入後可能出現）
+            (By.XPATH, "//*[contains(@class,'close') or @aria-label='Close' or @aria-label='關閉']"),
+            (By.XPATH, "//button[@type='button'][contains(@class,'close') or contains(@class,'btn-close')]"),
+            (By.CSS_SELECTOR, "[class*='modal'] [class*='close'], [class*='popup'] [class*='close']"),
         ]
         for locator in close_patterns:
             try:
@@ -187,6 +223,22 @@ class HomePage(BasePage):
         self.click_element_safely(self.TOPUP_PURCHASE_LINK)
         try:
             WebDriverWait(self.driver, 5).until(EC.alert_is_present())
+            self.driver.switch_to.alert.accept()
+        except TimeoutException:
+            pass
+
+    def click_bag_btn(self):
+        """點擊雲端背包按鈕，會開新分頁。"""
+        self.click_element_safely(self.BAG_BTN)
+
+    def click_open_service(self):
+        """點擊開通服務按鈕，展開 fbContent 彈窗。"""
+        from selenium.webdriver.support import expected_conditions as EC_inner
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.common.exceptions import TimeoutException
+        self.click_element_safely(self.OPEN_BTN)
+        try:
+            WebDriverWait(self.driver, 5).until(EC_inner.alert_is_present())
             self.driver.switch_to.alert.accept()
         except TimeoutException:
             pass

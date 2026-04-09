@@ -42,6 +42,9 @@ if exist "%~dp0allure-report\history" (
   echo NOTE: no previous allure-report\history folder.
 )
 
+echo [2b/6] copy categories.json for Allure blocked category...
+if exist "%~dp0categories.json" copy /Y "%~dp0categories.json" "%~dp0allure-results\categories.json" >nul
+
 echo [3/6] allure generate...
 if not defined JAVA_HOME (
   for /d %%J in ("C:\Program Files\Microsoft\jdk-*") do set "JAVA_HOME=%%~J" & goto have_java

@@ -108,3 +108,19 @@ class BasePage:
             return self.wait.until(EC.presence_of_all_elements_located(locator))
         except TimeoutException:
             return []
+
+    def check_for_rate_limit(self):
+        """偵測網站是否回傳 429 Too Many Requests，是則標記為被鎖定並跳過。"""
+        import pytest
+        from selenium.common.exceptions import UnexpectedAlertPresentException
+        try:
+            title = self.driver.title or ''
+            src = self.driver.page_source[:500] if self.driver.page_source else ''
+        except UnexpectedAlertPresentException:
+            try:
+                self.driver.switch_to.alert.accept()
+            except Exception:
+                pass
+            return
+        if '429' in title or 'Too Many Requests' in src or '429' in src:
+            pytest.skip('被鎖定：429 Too Many Requests - 網站流量限制，請稍後重試')

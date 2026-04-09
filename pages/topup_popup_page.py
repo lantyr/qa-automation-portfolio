@@ -49,16 +49,21 @@ class TopupPopupPage(BasePage):
     # ── 左側帳號資訊區（iframe context 內）─────────────────
     # ⚠️ 需依實際 DOM 調整
     REMAINING_POINTS_AREA = (By.ID, "Remain_point1_lbl_remain_point")
+    MEMBER_VERIFIED_LABEL = (By.ID, "Remain_point1_lblVerifiedMember")
     CURRENT_POINTS_AREA   = (By.ID, "Remain_point1_lbl_remain_point")
 
     # ── 左側導覽列（iframe context 內）─────────────────────
     # ⚠️ 需依實際 DOM 調整
+    NAV_QUERY_RECORDS = (By.XPATH, "//div[contains(@class,'menuButton') and contains(.,'查詢記錄')]")
     NAV_BUY_POINTS   = (By.XPATH, "//div[contains(@class,'menuButton') and contains(.,'購買點數')]")
     NAV_TOPUP_RECORD = (By.XPATH, "//a[contains(@class,'leftMenuSub') and contains(.,'儲值記錄')]")
     NAV_CONSUMPTION  = (By.XPATH, "//a[contains(@class,'leftMenuSub') and contains(.,'消費記錄')]")
     NAV_GAME_POINTS  = (By.XPATH, "//a[contains(@class,'leftMenuSub') and contains(.,'遊戲專用點數')]")
     NAV_RECENT_TOPUP = (By.XPATH, "//a[contains(@class,'leftMenuSub') and contains(.,'最近的儲值紀錄')]")
     NAV_BILLING      = (By.XPATH, "//div[contains(@class,'menuButton') and contains(.,'計費設定')]")
+    NAV_SERIAL_TOPUP  = (By.XPATH, "//div[contains(@class,'menuButton') and contains(.,'序號儲值')]")
+    LOCKED_VERIFY_BTN = (By.CSS_SELECTOR, "a.btn.active")                          # 未解鎖時「前往認證」按鈕
+    PAYMENT_METHOD_TITLE = (By.CSS_SELECTOR, "div.content-title.fixed")            # 已解鎖「請選擇支付方式」
 
     # ── 頁面內容載入指標（iframe context 內）────────────────
     # 點擊左側導覽後等待此元素出現代表主內容已載入
@@ -110,10 +115,46 @@ class TopupPopupPage(BasePage):
             EC.visibility_of_element_located(self.REMAINING_POINTS_AREA)
         )
 
+    def assert_verified_member(self, timeout: int = 10) -> None:
+        """驗證側欄顯示「認證會員」（有進階認證）。"""
+        el = WebDriverWait(self.driver, timeout).until(
+            EC.visibility_of_element_located(self.MEMBER_VERIFIED_LABEL)
+        )
+        assert '認證會員' in el.text, f'預期顯示認證會員，實際為：{el.text}'
+
+    def assert_general_member(self, timeout: int = 10) -> None:
+        """驗證側欄顯示「一般會員」（無進階認證）。"""
+        el = WebDriverWait(self.driver, timeout).until(
+            EC.visibility_of_element_located(self.MEMBER_VERIFIED_LABEL)
+        )
+        assert '一般會員' in el.text, f'預期顯示一般會員，實際為：{el.text}'
+
+    def get_member_verified_text(self, timeout: int = 10) -> str:
+        """取得側欄會員認證狀態文字。"""
+        el = WebDriverWait(self.driver, timeout).until(
+            EC.visibility_of_element_located(self.MEMBER_VERIFIED_LABEL)
+        )
+        return el.text.strip()
+
     def assert_current_points_visible(self, timeout: int = 10) -> None:
         """驗證左側帳號資訊區「當前點數」可見。"""
         WebDriverWait(self.driver, timeout).until(
             EC.visibility_of_element_located(self.CURRENT_POINTS_AREA)
+        )
+
+    def expand_query_records(self, timeout: int = 10) -> None:
+        """
+        確保「查詢記錄」子選單已展開（含 'open' class）。
+        若已展開則不重複點擊，避免收合。
+        """
+        btn = WebDriverWait(self.driver, timeout).until(
+            EC.presence_of_element_located(self.NAV_QUERY_RECORDS)
+        )
+        if "open" not in btn.get_attribute("class"):
+            btn.click()
+        # 等待子選單項目可見
+        WebDriverWait(self.driver, timeout).until(
+            EC.visibility_of_element_located(self.NAV_TOPUP_RECORD)
         )
 
     def click_nav_item(self, locator) -> None:
@@ -131,6 +172,32 @@ class TopupPopupPage(BasePage):
         WebDriverWait(self.driver, timeout).until(
             EC.presence_of_element_located(self.PAGE_CONTENT)
         )
+
+    def assert_locked_page(self, timeout: int = 10) -> None:
+        """驗證頁面為未解鎖狀態：「前往認證」按鈕存在。"""
+        el = WebDriverWait(self.driver, timeout).until(
+            EC.visibility_of_element_located(self.LOCKED_VERIFY_BTN)
+        )
+        assert "前往認證" in el.text, f"預期顯示前往認證按鈕，實際文字：{el.text}"
+
+    def assert_buy_points_unlocked(self, timeout: int = 10) -> None:
+        """驗證購買點數頁已解鎖：「請選擇支付方式」可見。"""
+        el = WebDriverWait(self.driver, timeout).until(
+            EC.visibility_of_element_located(self.PAYMENT_METHOD_TITLE)
+        )
+        assert "請選擇支付方式" in el.text, f"預期顯示支付方式選擇，實際文字：{el.text}"
+
+    def click_nav_serial_topup(self, timeout: int = 10) -> None:
+        """點擊左側導覽「序號儲值」。"""
+        WebDriverWait(self.driver, timeout).until(
+            EC.element_to_be_clickable(self.NAV_SERIAL_TOPUP)
+        ).click()
+
+    def click_nav_buy_points(self, timeout: int = 10) -> None:
+        """點擊左側導覽「購買點數」。"""
+        WebDriverWait(self.driver, timeout).until(
+            EC.element_to_be_clickable(self.NAV_BUY_POINTS)
+        ).click()
 
     def click_close_button(self, timeout: int = 10) -> None:
         """切換回主文件後點擊關閉按鈕，並等待彈窗消失。"""

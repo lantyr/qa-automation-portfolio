@@ -1,0 +1,17 @@
+[
+  {
+    "name": "被鎖定 (429 Too Many Requests)",
+    "matchedStatuses": ["skipped"],
+    "messageRegex": ".*被鎖定.*429.*|.*429.*被鎖定.*"
+  },
+  {
+    "name": "產品缺陷 (Product Defect)",
+    "matchedStatuses": ["failed"],
+    "traceRegex": ".*AssertionError.*"
+  },
+  {
+    "name": "測試問題 (Test Issue)",
+    "matchedStatuses": ["broken"],
+    "traceRegex": ".*"
+  }
+]
