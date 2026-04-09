@@ -2,7 +2,7 @@ name: 每日官網自動化測試
 
 on:
   schedule:
-   - cron: '30 0 * * *'
+   - cron: '0 1 * * *'
   workflow_dispatch:
 
 jobs:
@@ -30,8 +30,14 @@ jobs:
         run: npm install -g allure-commandline --save-dev
 
       - name: 5. 執行自動化測試 (無頭模式)
-        run: py -m pytest -p no:cacheprovider --clean-alluredir --alluredir=allure-results
-        continue-on-error: true
+        # 這裡明確指定了三個測試檔案，確保不會跑錯
+        run: |
+          python -m pytest tests/test_pc_homepage.py tests/test_pc_navbar_states.py tests/test_pc_topup_store.py -p no:cacheprovider --clean-alluredir --alluredir=allure-results
+        env:
+          # 務必確保這裡有從 Secrets 讀取帳密，否則無頭模式下登入會失敗
+          BEANFUN_ACCOUNT: ${{ secrets.BEANFUN_ACCOUNT }}
+          BEANFUN_PASSWORD: ${{ secrets.BEANFUN_PASSWORD }}
+          BEANFUN_OTP: ${{ secrets.BEANFUN_OTP }}
         
       - name: 6. 產生與打包 Allure 報告
         run: |
