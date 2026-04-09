@@ -7,7 +7,7 @@ on:
 
 jobs:
   run-auto-test:
-    runs-on: self-hosted 
+    runs-on: windows-latest 
 
     steps:
       - name: 0. 清除舊的快取檔案
