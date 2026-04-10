@@ -216,9 +216,11 @@ class HomePage(BasePage):
     def open_topup_popup(self):
         """
         展開 GASH 點數子選單，再點擊「儲值與購點」進入彈窗。
+        若選單已展開（toggle 狀態殘留），直接使用；若未展開才點擊開啟。
         點擊後等待 JS alert（資安提示）出現並接受，最多等 5 秒。
         """
-        self.click_element_safely(self.REMAINING_POINTS_TOGGLE)
+        if not self.is_element_displayed(self.GASH_SUBMENU, timeout=2):
+            self.click_element_safely(self.REMAINING_POINTS_TOGGLE)
         self.wait_until_visible(self.GASH_SUBMENU)
         self.click_element_safely(self.TOPUP_PURCHASE_LINK)
         try:

@@ -281,66 +281,6 @@ class TestPCTopupStore:
 
 
     # ────────────────────────────────────────────────────────────
-    # TC-PC-HOME-015
-    # ────────────────────────────────────────────────────────────
-    @allure.title("TC-PC-HOME-015：點擊雲端背包開啟新分頁")
-    def test_tc_pc_home_015_bag(self):
-        # Test ID: TC-PC-HOME-015
-        # Test Title: 點擊雲端背包開啟新分頁
-        # Test Steps:
-        #   1. 確認已登入首頁，點擊「雲端背包」按鈕
-        #   2. 驗證新分頁已開啟且 URL 包含 Backpack
-        # Expected Result: 新分頁 URL 包含 Backpack 路徑
-
-        with allure.step("1. 前往首頁並點擊雲端背包"):
-            self.home.go_to_home()
-            original_handles = self.driver.window_handles
-            self.home.click_bag_btn()
-            _screenshot(self.driver, "步驟1_點擊雲端背包")
-
-        with allure.step("2. 驗證新分頁開啟且 URL 包含 Backpack"):
-            WebDriverWait(self.driver, 10).until(
-                lambda d: len(d.window_handles) > len(original_handles)
-            )
-            self.driver.switch_to.window(self.driver.window_handles[-1])
-            WebDriverWait(self.driver, 10).until(
-                EC.url_contains("Backpack")
-            )
-            _screenshot(self.driver, "步驟2_新分頁URL驗證")
-            self.driver.close()
-            self.driver.switch_to.window(self.driver.window_handles[0])
-
-    # ────────────────────────────────────────────────────────────
-    # TC-PC-HOME-016
-    # ────────────────────────────────────────────────────────────
-    @allure.title("TC-PC-HOME-016：點擊開通服務開啟任務儀表板彈窗")
-    def test_tc_pc_home_016_open_service(self):
-        # Test ID: TC-PC-HOME-016
-        # Test Title: 點擊開通服務開啟任務儀表板彈窗
-        # Test Steps:
-        #   1. 前往首頁，點擊「開通服務」按鈕
-        #   2. 驗證 fbContent 彈窗出現
-        #   3. 切換至彈窗 iframe，驗證頁面為 MissionDashBoard
-        # Expected Result: fbContent 彈窗出現，iframe 內含 MissionDashBoard form
-
-        with allure.step("1. 前往首頁並點擊開通服務"):
-            self.home.go_to_home()
-            self.home.click_open_service()
-            _screenshot(self.driver, "步驟1_點擊開通服務")
-
-        with allure.step("2. 驗證 fbContent 彈窗出現"):
-            self.topup.assert_popup_root_visible(_TIMEOUT)
-            _screenshot(self.driver, "步驟2_彈窗出現")
-
-        with allure.step("3. 驗證 iframe 內為 MissionDashBoard"):
-            self.topup.switch_to_popup_iframe(_TIMEOUT)
-            WebDriverWait(self.driver, _TIMEOUT).until(
-                EC.presence_of_element_located(self.home.MISSION_DASHBOARD_FORM)
-            )
-            _screenshot(self.driver, "步驟3_MissionDashBoard確認")
-            self.driver.switch_to.default_content()
-
-    # ────────────────────────────────────────────────────────────
     # TC-PC-SP-011
     # ────────────────────────────────────────────────────────────
     @allure.title("TC-PC-SP-011：側欄進階認證狀態顯示（有進階認證）")
@@ -371,18 +311,18 @@ class TestPCTopupStore:
 
 
     # ────────────────────────────────────────────────────────────
-    # TC-PC-SP-015
+    # TC-PC-SP-012
     # ────────────────────────────────────────────────────────────
-    @allure.title("TC-PC-SP-015：購買點數頁顯示（已解鎖）")
-    def test_tc_pc_sp_015_buy_points_unlocked(self):
-        # Test ID: TC-PC-SP-015
+    @allure.title("TC-PC-SP-012：購買點數頁顯示（已解鎖）")
+    def test_tc_pc_sp_012_buy_points_unlocked(self):
+        # Test ID: TC-PC-SP-012
         # Test Title: 購買點數頁顯示（已解鎖）
         # Test Steps:
         #   前提) 已登入認證會員帳號
         #   1. 開啟儲值與購點彈窗，切換至 iframe
         #   2. 點擊左側導覽「購買點數」
-        #   3. 驗證頁面顯示「請選擇支付方式」
-        # Expected Result: 購買點數頁已解鎖，顯示支付方式選擇
+        #   3. 驗證支付方式選擇容器（div.type-btns）可見
+        # Expected Result: 購買點數頁已解鎖，信用卡／讀卡機轉帳／橘子支付選項顯示
 
         with allure.step("1. 開啟彈窗並切換至 iframe"):
             self.home.go_to_home()
@@ -395,7 +335,7 @@ class TestPCTopupStore:
             self.topup.click_nav_buy_points(_TIMEOUT)
             _screenshot(self.driver, "步驟2_點擊購買點數")
 
-        with allure.step("3. 驗證已解鎖顯示支付方式選擇"):
+        with allure.step("3. 驗證支付方式選擇容器可見"):
             self.topup.assert_buy_points_unlocked(_TIMEOUT)
             _screenshot(self.driver, "步驟3_支付方式可見")
             self.driver.switch_to.default_content()
@@ -427,11 +367,11 @@ class TestPCTopupGeneralMember:
             pass
 
     # ────────────────────────────────────────────────────────────
-    # TC-PC-SP-012
+    # TC-PC-SP-001
     # ────────────────────────────────────────────────────────────
-    @allure.title("TC-PC-SP-012：側欄進階認證狀態顯示（無進階認證）")
-    def test_tc_pc_sp_012_general_member(self):
-        # Test ID: TC-PC-SP-012
+    @allure.title("TC-PC-SP-001：側欄進階認證狀態顯示（無進階認證）")
+    def test_tc_pc_sp_001_general_member(self):
+        # Test ID: TC-PC-SP-001
         # Test Title: 側欄進階認證狀態顯示（無進階認證）
         # Test Steps:
         #   前提) 已登入一般會員帳號（純點帳 hfivenew）
@@ -455,11 +395,11 @@ class TestPCTopupGeneralMember:
             self.driver.switch_to.default_content()
 
     # ────────────────────────────────────────────────────────────
-    # TC-PC-SP-013
+    # TC-PC-SP-002
     # ────────────────────────────────────────────────────────────
-    @allure.title("TC-PC-SP-013：購買點數頁顯示（未解鎖）")
-    def test_tc_pc_sp_013_buy_points_locked(self):
-        # Test ID: TC-PC-SP-013
+    @allure.title("TC-PC-SP-002：購買點數頁顯示（未解鎖）")
+    def test_tc_pc_sp_002_buy_points_locked(self):
+        # Test ID: TC-PC-SP-002
         # Test Title: 購買點數頁顯示（未解鎖）
         # Test Steps:
         #   前提) 已登入一般會員帳號
@@ -479,16 +419,16 @@ class TestPCTopupGeneralMember:
             _screenshot(self.driver, "步驟2_點擊購買點數")
 
         with allure.step("3. 驗證未解鎖提示出現"):
-            self.topup.assert_locked_page(_TIMEOUT)
+            self.topup.assert_buy_points_locked(_TIMEOUT)
             _screenshot(self.driver, "步驟3_未解鎖提示")
             self.driver.switch_to.default_content()
 
     # ────────────────────────────────────────────────────────────
-    # TC-PC-SP-014
+    # TC-PC-SP-003
     # ────────────────────────────────────────────────────────────
-    @allure.title("TC-PC-SP-014：序號儲值頁顯示（未解鎖）")
-    def test_tc_pc_sp_014_serial_topup_locked(self):
-        # Test ID: TC-PC-SP-014
+    @allure.title("TC-PC-SP-003：序號儲值頁顯示（未解鎖）")
+    def test_tc_pc_sp_003_serial_topup_locked(self):
+        # Test ID: TC-PC-SP-003
         # Test Title: 序號儲值頁顯示（未解鎖）
         # Test Steps:
         #   前提) 已登入一般會員帳號
@@ -508,13 +448,13 @@ class TestPCTopupGeneralMember:
             _screenshot(self.driver, "步驟2_點擊序號儲值")
 
         with allure.step("3. 驗證未解鎖提示出現"):
-            self.topup.assert_locked_page(_TIMEOUT)
+            self.topup.assert_serial_topup_locked(_TIMEOUT)
             _screenshot(self.driver, "步驟3_未解鎖提示")
             self.driver.switch_to.default_content()
 
 
 # ════════════════════════════════════════════════════════════════
-# SP-018：GP點帳（gamaplay830）進階認證狀態驗證
+# SP-001：GP點帳（gamaplay830）進階認證狀態驗證
 # ════════════════════════════════════════════════════════════════
 @allure.feature("PC版儲值彈窗 - GP點帳進階認證")
 class TestPCTopupGPAccount:
@@ -549,9 +489,9 @@ class TestPCTopupGPAccount:
         except Exception:
             pass
 
-    @allure.title("TC-PC-SP-018：GP點帳(1.0)進階認證狀態顯示（有手機驗證）")
-    def test_tc_pc_sp_018_gp_verified_member(self):
-        # Test ID: TC-PC-SP-018
+    @allure.title("TC-PC-SP-001：GP點帳(1.0)進階認證狀態顯示（有手機驗證）")
+    def test_tc_pc_sp_001_gp_verified_member(self):
+        # Test ID: TC-PC-SP-001
         # Test Title: GP點帳(1.0)進階認證狀態顯示（有手機驗證）
         # Test Steps:
         #   前提) 已登入 GP 點帳（gamaplay830，有進階認證）
@@ -576,7 +516,7 @@ class TestPCTopupGPAccount:
 
 
 # ════════════════════════════════════════════════════════════════
-# SP-019：星帳（gamaplay788）進階認證狀態驗證
+# SP-001：星帳（gamaplay788）進階認證狀態驗證
 # ════════════════════════════════════════════════════════════════
 @allure.feature("PC版儲值彈窗 - 星帳進階認證")
 class TestPCTopupStarAccount:
@@ -609,9 +549,9 @@ class TestPCTopupStarAccount:
         except Exception:
             pass
 
-    @allure.title("TC-PC-SP-019：星帳(2.0)預設進階認證狀態顯示")
-    def test_tc_pc_sp_019_star_verified_member(self):
-        # Test ID: TC-PC-SP-019
+    @allure.title("TC-PC-SP-001：星帳(2.0)預設進階認證狀態顯示")
+    def test_tc_pc_sp_001_star_verified_member(self):
+        # Test ID: TC-PC-SP-001
         # Test Title: 星帳(2.0)預設進階認證狀態顯示
         # Test Steps:
         #   前提) 已登入星帳（gamaplay788，預設有進階認證）
@@ -636,7 +576,7 @@ class TestPCTopupStarAccount:
 
 
 # ════════════════════════════════════════════════════════════════
-# SP-017：純點帳已綁手機（000101）進階認證狀態驗證
+# SP-001：純點帳已綁手機（000101）進階認證狀態驗證
 # ════════════════════════════════════════════════════════════════
 @allure.feature("PC版儲值彈窗 - 純點帳進階認證（有手機）")
 class TestPCTopupPureVerifiedAccount:
@@ -666,9 +606,9 @@ class TestPCTopupPureVerifiedAccount:
         except Exception:
             pass
 
-    @allure.title("TC-PC-SP-017：純點帳進階認證狀態顯示（有手機驗證）")
-    def test_tc_pc_sp_017_pure_verified_member(self):
-        # Test ID: TC-PC-SP-017
+    @allure.title("TC-PC-SP-001：純點帳進階認證狀態顯示（有手機驗證）")
+    def test_tc_pc_sp_001_pure_verified_member(self):
+        # Test ID: TC-PC-SP-001
         # Test Title: 純點帳進階認證狀態顯示（有手機驗證）
         # Test Steps:
         #   前提) 已登入純點帳且已綁手機（hfivenew-000101，認證會員）

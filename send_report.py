@@ -44,7 +44,7 @@ def _parse_receiver_list(raw: str) -> list[str]:
 def get_detailed_report(results_dir):
     """讀取 Allure JSON 並生成詳細的步驟清單"""
     all_reports = ""
-    summary_data = {"total": 0, "passed": 0, "failed": 0}
+    summary_data = {"total": 0, "passed": 0, "failed": 0, "skipped": 0}
     
     json_files = glob.glob(os.path.join(results_dir, "*-result.json"))
     if not json_files:
@@ -75,11 +75,22 @@ def get_detailed_report(results_dir):
         "驗證：已開通整合點帳進行登入測試 (全自動)": "驗證：已開通整合點帳",
         "驗證：「舊 H5 需手動選取帳號」登入測試 (全自動)": "驗證：未開通整合點帳",
     }
-    feature_order = ["PC版官網登入頁", "會員登入功能"]
+    feature_order = [
+        "PC版官網登入頁",
+        "會員登入功能",
+        "PC版官網首頁功能驗證",
+        "PC版官網Action Bar",
+        "PC版官網儲值與購點",
+        "PC版儲值彈窗 - 一般會員（無進階認證）",
+        "PC版儲值彈窗 - GP點帳進階認證",
+        "PC版儲值彈窗 - 星帳進階認證",
+        "PC版儲值彈窗 - 純點帳進階認證（有手機）",
+        "PC版官網客服中心",
+    ]
     ordered_features = [f for f in feature_order if f in features] + [f for f in features if f not in feature_order]
 
     for feature in ordered_features:
-        tests = features[feature]
+        tests = sorted(features[feature], key=lambda t: t.get("name", ""))
         section_title = feature_title_map.get(feature, f"以下為 {feature} 的自動化測試用例結果")
         all_reports += f"{section_title}\n"
 
@@ -92,15 +103,17 @@ def get_detailed_report(results_dir):
             
             if test['status'] == 'passed':
                 summary_data["passed"] += 1
+            elif test['status'] == 'skipped':
+                summary_data["skipped"] += 1
             else:
                 summary_data["failed"] += 1
             
-            for step in test.get('steps', []):
+            for s_idx, step in enumerate(test.get('steps', []), 1):
                 step_status = "OK" if step['status'] == 'passed' else "Failed"
                 step_name = step.get("name", "").strip()
                 step_name = re.sub(r"^步驟\s*\d+\s*:\s*", "", step_name)
                 step_name = re.sub(r"^\d+\.\s*", "", step_name)
-                all_reports += f"{step_name} [{step_status}]\n\n"
+                all_reports += f"\t步驟 {s_idx}: {step_name} [{step_status}]\n\n"
         all_reports += "\n"
 
     success_rate = (summary_data["passed"] / summary_data["total"] * 100) if summary_data["total"] > 0 else 0
@@ -180,6 +193,7 @@ def send_email():
 📊 數據統計中心：
 ✅ 通過數量：{summary['passed']}
 ❌ 失敗數量：{summary['failed']}
+🔒 環境因素被鎖：{summary['skipped']}
 📈 總測試數：{summary['total']}
 🏆 最終成功率：{success_rate:.1f}%
 ━━━━━━━━━━━━━━━━━━━━━━━━━━

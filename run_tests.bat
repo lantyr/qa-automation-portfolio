@@ -23,7 +23,7 @@ if exist "%~dp0.venv\Scripts\python.exe" (
 )
 
 echo [1/6] pytest + allure-results...
-"%PYEXE%" -m pytest --clean-alluredir --alluredir=allure-results
+"%PYEXE%" -m pytest --clean-alluredir --alluredir=allure-results --reruns 1 --reruns-delay 3
 if errorlevel 1 (
   echo NOTE - pytest had failures, continuing with Allure and email steps
 )

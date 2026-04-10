@@ -22,11 +22,10 @@ def pytest_configure(config):
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
 def pytest_runtest_makereport(item, call):
-    """test_pc_topup_store 測試失敗時自動截圖並附加至 Allure 報告。"""
+    """任何測試失敗時自動截圖並附加至 Allure 報告。"""
     outcome = yield
     rep = outcome.get_result()
-    _SCREENSHOT_TESTS = ("test_pc_topup_store", "test_pc_navbar_states")
-    if rep.when == "call" and rep.failed and any(t in item.nodeid for t in _SCREENSHOT_TESTS):
+    if rep.when == "call" and rep.failed:
         driver = item.funcargs.get("class_driver") or item.funcargs.get("driver")
         if driver:
             try:

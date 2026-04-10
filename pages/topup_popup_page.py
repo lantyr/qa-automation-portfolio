@@ -32,6 +32,10 @@ class TopupPopupPage(BasePage):
     # 彈窗本身即為 iframe，id="fbContent"
     POPUP_IFRAME = (By.ID, "fbContent")
 
+    # ── 內容區 iframe（購買點數、序號儲值等頁面載入在此）────
+    # src="point_buy_default.aspx" 等，name="beanfun_main_content"
+    CONTENT_IFRAME = (By.NAME, "beanfun_main_content")
+
     # ── 關閉按鈕（主文件 context，位於彈窗右上角）───────────
     # default.css: #BF_divPopWindow .BF_Header .BF_CloseButton a.popclose
     CLOSE_BTN = (By.ID, "fbClose")
@@ -62,8 +66,10 @@ class TopupPopupPage(BasePage):
     NAV_RECENT_TOPUP = (By.XPATH, "//a[contains(@class,'leftMenuSub') and contains(.,'最近的儲值紀錄')]")
     NAV_BILLING      = (By.XPATH, "//div[contains(@class,'menuButton') and contains(.,'計費設定')]")
     NAV_SERIAL_TOPUP  = (By.XPATH, "//div[contains(@class,'menuButton') and contains(.,'序號儲值')]")
-    LOCKED_VERIFY_BTN = (By.CSS_SELECTOR, "a.btn.active")                          # 未解鎖時「前往認證」按鈕
-    PAYMENT_METHOD_TITLE = (By.CSS_SELECTOR, "div.content-title.fixed")            # 已解鎖「請選擇支付方式」
+    LOCKED_BUY_VERIFY_BTN    = (By.CSS_SELECTOR, "a.btn.active")   # SP-013 購買點數未解鎖：onclick="goVerification()"
+    LOCKED_SERIAL_VERIFY_BTN = (By.ID, "lnkAdvancedVerify")        # SP-014 序號儲值未解鎖：無 active class
+    BUY_POINTS_GBOX_BTN      = (By.CSS_SELECTOR, "div.gbox-action a.gbox-btn")  # 未解鎖的前往驗證按鈕
+    PAYMENT_TYPE_BTNS        = (By.CSS_SELECTOR, "div.type-btns")               # SP-015 已解鎖：支付方式選擇容器
 
     # ── 頁面內容載入指標（iframe context 內）────────────────
     # 點擊左側導覽後等待此元素出現代表主內容已載入
@@ -86,6 +92,14 @@ class TopupPopupPage(BasePage):
         self.driver.switch_to.default_content()
         iframe = WebDriverWait(self.driver, timeout).until(
             EC.presence_of_element_located(self.POPUP_IFRAME)
+        )
+        self.driver.switch_to.frame(iframe)
+
+    def switch_to_content_iframe(self, timeout: int = 10) -> None:
+        """切換至彈窗內的內容 iframe（beanfun_main_content）。
+        須在已切換至 POPUP_IFRAME (fbContent) 後呼叫。"""
+        iframe = WebDriverWait(self.driver, timeout).until(
+            EC.presence_of_element_located(self.CONTENT_IFRAME)
         )
         self.driver.switch_to.frame(iframe)
 
@@ -173,31 +187,52 @@ class TopupPopupPage(BasePage):
             EC.presence_of_element_located(self.PAGE_CONTENT)
         )
 
-    def assert_locked_page(self, timeout: int = 10) -> None:
-        """驗證頁面為未解鎖狀態：「前往認證」按鈕存在。"""
+    def assert_buy_points_locked(self, timeout: int = 10) -> None:
+        """SP-013：購買點數頁未解鎖，切換至內層 iframe 後驗證「前往認證」按鈕（a.btn.active）存在。"""
+        self.switch_to_content_iframe(timeout)
         el = WebDriverWait(self.driver, timeout).until(
-            EC.visibility_of_element_located(self.LOCKED_VERIFY_BTN)
+            EC.visibility_of_element_located(self.LOCKED_BUY_VERIFY_BTN)
         )
         assert "前往認證" in el.text, f"預期顯示前往認證按鈕，實際文字：{el.text}"
 
-    def assert_buy_points_unlocked(self, timeout: int = 10) -> None:
-        """驗證購買點數頁已解鎖：「請選擇支付方式」可見。"""
+    def assert_serial_topup_locked(self, timeout: int = 10) -> None:
+        """SP-014：序號儲值頁未解鎖，切換至內層 iframe 後驗證「前往認證」連結（#lnkAdvancedVerify）存在。"""
+        self.switch_to_content_iframe(timeout)
         el = WebDriverWait(self.driver, timeout).until(
-            EC.visibility_of_element_located(self.PAYMENT_METHOD_TITLE)
+            EC.visibility_of_element_located(self.LOCKED_SERIAL_VERIFY_BTN)
         )
-        assert "請選擇支付方式" in el.text, f"預期顯示支付方式選擇，實際文字：{el.text}"
+        assert "前往認證" in el.text, f"預期顯示前往認證連結，實際文字：{el.text}"
+
+    def assert_buy_points_unlocked(self, timeout: int = 10) -> None:
+        """SP-015：切換至內層 iframe，驗證支付方式選擇容器（div.type-btns）可見。"""
+        self.switch_to_content_iframe(timeout)
+        WebDriverWait(self.driver, timeout).until(
+            EC.visibility_of_element_located(self.PAYMENT_TYPE_BTNS)
+        )
 
     def click_nav_serial_topup(self, timeout: int = 10) -> None:
-        """點擊左側導覽「序號儲值」。"""
+        """點擊左側導覽「序號儲值」，並處理可能出現的 JS alert 後重新切回 iframe。"""
         WebDriverWait(self.driver, timeout).until(
             EC.element_to_be_clickable(self.NAV_SERIAL_TOPUP)
         ).click()
+        try:
+            WebDriverWait(self.driver, 5).until(EC.alert_is_present())
+            self.driver.switch_to.alert.accept()
+            self.switch_to_popup_iframe(timeout)
+        except TimeoutException:
+            pass
 
     def click_nav_buy_points(self, timeout: int = 10) -> None:
-        """點擊左側導覽「購買點數」。"""
+        """點擊左側導覽「購買點數」，並處理可能出現的 JS alert 後重新切回 iframe。"""
         WebDriverWait(self.driver, timeout).until(
             EC.element_to_be_clickable(self.NAV_BUY_POINTS)
         ).click()
+        try:
+            WebDriverWait(self.driver, 5).until(EC.alert_is_present())
+            self.driver.switch_to.alert.accept()
+            self.switch_to_popup_iframe(timeout)
+        except TimeoutException:
+            pass
 
     def click_close_button(self, timeout: int = 10) -> None:
         """切換回主文件後點擊關閉按鈕，並等待彈窗消失。"""
