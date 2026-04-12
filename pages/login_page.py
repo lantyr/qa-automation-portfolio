@@ -1,7 +1,9 @@
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import UnexpectedAlertPresentException
 from .base_page import BasePage
+import pytest
 import time
 import allure
 
@@ -39,12 +41,27 @@ class LoginPage(BasePage):
 
     # ---  頁面動作 ---
     #  新增 wait_for_verify 開關，預設為 True (正常流程)
+    def _handle_captcha_alert(self):
+        """偵測並接受 CAPTCHA 驗證對話框，出現時自動 SKIP 測試。"""
+        try:
+            alert = self.driver.switch_to.alert
+            text = alert.text or ''
+            alert.accept()
+            if '機器人' in text or 'CAPTCHA' in text.upper():
+                pytest.skip(f"CAPTCHA 出現（{text}），網站偵測到自動化瀏覽器，請稍後重試")
+        except Exception:
+            pass
+
     def login_action(self, phone, password, wait_for_verify=True):
         self.handle_announcement()
+        self._handle_captcha_alert()
         
         print("[1/4] 正在填寫初始帳號並點擊登入...")
         old_handles = self.driver.window_handles
-        account_el = self.wait_until_visible(self.STEP1_ACCOUNT)
+        try:
+            account_el = self.wait_until_visible(self.STEP1_ACCOUNT)
+        except UnexpectedAlertPresentException:
+            self._handle_captcha_alert()
         account_el.click()
         account_el.send_keys(phone)
         btn_element = self.wait_until_visible(self.STEP1_BTN)
@@ -53,7 +70,11 @@ class LoginPage(BasePage):
         self.wait_and_switch_window(old_handles)
 
         print(f"[2/4] 正在填寫帳號: {phone}")
-        phone_el = self.wait.until(EC.visibility_of_element_located(self.PHONE_INPUT))
+        try:
+            phone_el = self.wait.until(EC.visibility_of_element_located(self.PHONE_INPUT))
+        except UnexpectedAlertPresentException:
+            self._handle_captcha_alert()
+            phone_el = self.wait.until(EC.visibility_of_element_located(self.PHONE_INPUT))
         phone_el.click()
         phone_el.send_keys(Keys.CONTROL, 'a')
         phone_el.send_keys(phone)
