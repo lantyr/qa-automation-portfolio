@@ -236,9 +236,11 @@ class TopupPopupPage(BasePage):
             pass
 
     def click_close_button(self, timeout: int = 10) -> None:
-        """切換回主文件後點擊關閉按鈕，並等待彈窗消失。"""
+        """切換至 popup iframe 後點擊關閉按鈕，並等待彈窗消失。"""
         self.driver.switch_to.default_content()
+        self.switch_to_popup_iframe(timeout)
         self.click_element_safely(self.CLOSE_BTN)
+        self.driver.switch_to.default_content()
         WebDriverWait(self.driver, timeout).until(
             EC.invisibility_of_element_located(self.POPUP_ROOT)
         )
