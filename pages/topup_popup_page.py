@@ -38,7 +38,8 @@ class TopupPopupPage(BasePage):
 
     # ── 關閉按鈕（主文件 context，位於彈窗右上角）───────────
     # default.css: #BF_divPopWindow .BF_Header .BF_CloseButton a.popclose
-    CLOSE_BTN = (By.ID, "fbClose")
+    # 定位實際可點擊的 <a> 連結，而非外層容器 div#fbClose
+    CLOSE_BTN = (By.CSS_SELECTOR, "a.popclose")
 
     # ── 防詐騙 OTP 驗證彈窗（iframe context 內，可能出現）───
     # ⚠️ 需依實際 DOM 調整
