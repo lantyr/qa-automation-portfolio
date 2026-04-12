@@ -32,7 +32,7 @@ jobs:
 
       - name: 5. 執行自動化測試 (無頭模式)
         run: |
-          python -m pytest tests/test_pc_homepage.py tests/test_pc_topup_store.py -p no:cacheprovider --clean-alluredir --alluredir=allure-results
+          python -m pytest tests/test_pc_action_bar.py tests/test_pc_customer_service.py tests/test_pc_homepage.py tests/test_pc_topup_store.py -p no:cacheprovider --clean-alluredir --alluredir=allure-results
         env:
           # 務必確保這裡有從 Secrets 讀取帳密，否則無頭模式下登入會失敗
           BEANFUN_TEST_ACCOUNT: ${{ secrets.BEANFUN_TEST_ACCOUNT }}
