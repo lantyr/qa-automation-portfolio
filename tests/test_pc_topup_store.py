@@ -351,7 +351,10 @@ class TestPCTopupGeneralMember:
         self.home = HomePage(self.driver)
         self.login = LoginPage(self.driver)
         self.topup = TopupPopupPage(self.driver)
-        account, password = get_pure_credentials()
+        try:
+            account, password = get_pure_credentials()
+        except ValueError as e:
+            pytest.skip(str(e))
         self.home.go_to_home()
         self.home.click_login_btn()
         self.login.login_action_pure(account, password)
@@ -465,7 +468,10 @@ class TestPCTopupGPAccount:
         self.home = HomePage(self.driver)
         self.login = LoginPage(self.driver)
         self.topup = TopupPopupPage(self.driver)
-        account, password = get_gp_credentials()
+        try:
+            account, password = get_gp_credentials()
+        except ValueError as e:
+            pytest.skip(str(e))
         otp = get_beanfun_otp()
         try:
             self.home.go_to_home()
@@ -527,7 +533,10 @@ class TestPCTopupStarAccount:
         self.home = HomePage(self.driver)
         self.login = LoginPage(self.driver)
         self.topup = TopupPopupPage(self.driver)
-        account, password = get_star_credentials()
+        try:
+            account, password = get_star_credentials()
+        except ValueError as e:
+            pytest.skip(str(e))
         otp = get_beanfun_otp()
         try:
             self.home.go_to_home()
@@ -587,7 +596,10 @@ class TestPCTopupPureVerifiedAccount:
         self.home = HomePage(self.driver)
         self.login = LoginPage(self.driver)
         self.topup = TopupPopupPage(self.driver)
-        account, password = get_pure_verified_credentials()
+        try:
+            account, password = get_pure_verified_credentials()
+        except ValueError as e:
+            pytest.skip(str(e))
         try:
             self.home.go_to_home()
             self.home.click_login_btn()
