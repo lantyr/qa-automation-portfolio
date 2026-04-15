@@ -43,6 +43,18 @@ class HomePage(BasePage):
     OPEN_BTN   = (By.ID, "BF_btnOpen")     # 開通服務
     MISSION_DASHBOARD_FORM = (By.CSS_SELECTOR, "form#form1[action='MissionDashBoard.aspx']")
 
+    # --- 剩餘點數數字 ---
+    REMAIN_POINT = (By.ID, "BF_RemainPoint")
+
+    # --- 快速啟動遊戲 ---
+    QUICK_START_BTN = (By.ID, "BF_btnQuickStart")
+
+    # --- 快速啟動彈窗（BF_divPopWindow）---
+    # 點擊 BF_btnQuickStart 後出現
+    QUICK_START_POPUP   = (By.ID, "BF_divPopWindow")
+    # 彈窗內遊戲清單第一個 <li>（onclick="BeanFunBlock.StartGameWithAccountData(...)"）
+    QUICK_START_GAME_LI = (By.CSS_SELECTOR, "#BF_BaseList li")
+
     # --- GASH 點數子選單 ---
     # BF_btnGash：右下角「我的錢包/儲值」按鈕，點擊後展開 BF_divGashSubMenu
     REMAINING_POINTS_TOGGLE = (By.ID, "BF_btnGash")
@@ -211,6 +223,18 @@ class HomePage(BasePage):
                         el.click()
             except Exception:
                 pass
+
+    def click_quick_start(self):
+        """點擊快速啟動遊戲按鈕（BF_btnQuickStart），觸發彈窗出現。"""
+        self.click_element_safely(self.QUICK_START_BTN)
+
+    def click_first_game_in_popup(self):
+        """點擊快速啟動彈窗中第一個遊戲 li，觸發 StartGameWithAccountData。"""
+        self.click_element_safely(self.QUICK_START_GAME_LI)
+
+    def click_member_center(self):
+        """點擊會員中心按鈕，觸發頁面跳轉。"""
+        self.click_element_safely(self.MEMBER_BTN)
 
     # --- 儲值與購點 Actions ---
     def open_topup_popup(self):

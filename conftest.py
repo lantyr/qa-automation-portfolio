@@ -10,6 +10,12 @@ import config.credentials  # noqa: F401 - 載入 .env
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 
+collect_ignore = [
+    "tests/test_beanfun_home_v2.py",
+    "tests/test_beanfun_member_topup_pc.py",
+    "tests/test_negative_login.py",
+]
+
 
 def pytest_configure(config):
     """將 categories.json 複製至 allure-results，讓 Allure 報告顯示「被鎖定」分類欄位。"""

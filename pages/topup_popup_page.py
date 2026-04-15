@@ -71,6 +71,14 @@ class TopupPopupPage(BasePage):
     BUY_POINTS_GBOX_BTN      = (By.CSS_SELECTOR, "div.gbox-action a.gbox-btn")  # 未解鎖的前往驗證按鈕
     PAYMENT_TYPE_BTNS        = (By.CSS_SELECTOR, "div.type-btns")               # SP-015 已解鎖：支付方式選擇容器
 
+    # ── 更新點數（iframe context 內）────────────────────────────
+    # <span onclick="getRemainPoint();return false;">更新點數</span>
+    REFRESH_POINTS_BTN = (By.XPATH, "//span[contains(text(),'更新點數')]")
+
+    # ── 啟動遊戲（iframe context 內）────────────────────────────
+    # <div class="RightDetails" title="使用該遊戲帳號啟動遊戲">
+    GAME_START_BTN = (By.CSS_SELECTOR, "div.RightDetails[title='使用該遊戲帳號啟動遊戲']")
+
     # ── 頁面內容載入指標（iframe context 內）────────────────
     # 點擊左側導覽後等待此元素出現代表主內容已載入
     # ⚠️ 需依實際 DOM 調整
@@ -233,6 +241,27 @@ class TopupPopupPage(BasePage):
             self.switch_to_popup_iframe(timeout)
         except TimeoutException:
             pass
+
+    def click_refresh_points(self, timeout: int = 10) -> None:
+        """點擊「更新點數」span，觸發 getRemainPoint()。須在 popup iframe context 內呼叫。"""
+        btn = WebDriverWait(self.driver, timeout).until(
+            EC.element_to_be_clickable(self.REFRESH_POINTS_BTN)
+        )
+        btn.click()
+
+    def assert_serial_topup_unlocked(self, timeout: int = 10) -> None:
+        """SP-013 序號儲值已解鎖：切換至內層 iframe，驗證「前往認證」連結不存在。"""
+        self.switch_to_content_iframe(timeout)
+        WebDriverWait(self.driver, timeout).until(
+            EC.invisibility_of_element_located(self.LOCKED_SERIAL_VERIFY_BTN)
+        )
+
+    def click_game_start(self, timeout: int = 10) -> None:
+        """點擊「使用該遊戲帳號啟動遊戲」div。須在 popup iframe context 內呼叫。"""
+        btn = WebDriverWait(self.driver, timeout).until(
+            EC.element_to_be_clickable(self.GAME_START_BTN)
+        )
+        btn.click()
 
     def click_close_button(self, timeout: int = 10) -> None:
         """切換回主文件後點擊關閉按鈕，並等待彈窗消失。"""

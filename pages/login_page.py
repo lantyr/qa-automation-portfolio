@@ -248,23 +248,30 @@ class LoginPage(BasePage):
                 self.driver.execute_script("arguments[0].click();", self.driver.find_element(*close_btn))
         except:
             pass
-class TestData:
-    # 這裡存放所有登入情境的資料
-    MIGRATION_ACCOUNTS = [
-        {
-            "id": "757",
-            "desc": "已整合點帳 (直通官網)",
-            "user": "gamaplay757@gamapass.com",
-            "pwd": "Qq1234567",
-            "otp": "9999",
-            "target": None  # None 代表不需要選帳號步驟
-        },
-        {
-            "id": "762",
-            "desc": "舊H5點帳 (需選帳號)",
-            "user": "gamaplay762@gamapass.com",
-            "pwd": "Qq1234567",
-            "otp": "9999",
-            "target": "lilia25081808" # 預期要點選的帳號名字
-        }
-    ]
+
+    def switch_to_new_window(self, old_handles, timeout=15):
+        """等待新視窗出現並切換過去。比 wait_and_switch_window 更嚴格：失敗時拋出例外。"""
+        from selenium.webdriver.support.ui import WebDriverWait as _WDW
+        _WDW(self.driver, timeout).until(
+            lambda d: len(d.window_handles) > len(old_handles)
+        )
+        new_handle = [h for h in self.driver.window_handles if h not in old_handles][0]
+        self.driver.switch_to.window(new_handle)
+        self.driver.maximize_window()
+
+    def login_on_gamapass_window(self, phone, password):
+        """
+        在 GamaPass 視窗中完成帳密登入（不含 OTP / 前往驗證）。
+        前提：driver 已切換至 GamaPass 視窗。
+        """
+        phone_el = self.wait_until_visible(self.PHONE_INPUT)
+        phone_el.click()
+        phone_el.send_keys(Keys.CONTROL, 'a')
+        phone_el.send_keys(phone)
+
+        self.click_element_safely(self.NEXT_BTN)
+
+        pwd_el = self.wait_until_visible(self.PWD_INPUT)
+        pwd_el.send_keys(password)
+
+        self.click_element_safely(self.LOGIN_FINAL_BTN)

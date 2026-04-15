@@ -51,6 +51,7 @@ def get_detailed_report(results_dir):
         return "⚠️ 找不到任何測試結果，請確認 pytest 是否執行成功。", summary_data, 0
 
     features = {}
+    _dedup = {}
     for json_file in json_files:
         try:
             with open(json_file, 'r', encoding='utf-8') as f:
@@ -59,12 +60,21 @@ def get_detailed_report(results_dir):
                 for label in data.get('labels', []):
                     if label['name'] == 'feature':
                         feature_name = label['value']
-                
-                if feature_name not in features:
-                    features[feature_name] = []
-                features[feature_name].append(data)
+
+                full_name = data.get("fullName") or data.get("name", "")
+                dedup_key = (feature_name, full_name)
+                stop_ts = data.get("stop", 0)
+                if dedup_key in _dedup:
+                    if stop_ts <= _dedup[dedup_key].get("stop", 0):
+                        continue
+                _dedup[dedup_key] = data
         except Exception:
             continue
+
+    for (feature_name, _), data in _dedup.items():
+        if feature_name not in features:
+            features[feature_name] = []
+        features[feature_name].append(data)
 
     feature_title_map = {
         "PC版官網登入頁": "一、基礎頁面與防呆驗證",
@@ -77,14 +87,15 @@ def get_detailed_report(results_dir):
     }
     feature_order = [
         "PC版官網登入頁",
+        "共登PC-帳密登入",
+        "共登PC-Gama Pass登入",
+        "OPEN ID 登入",
         "會員登入功能",
         "PC版官網首頁功能驗證",
-        "PC版官網Action Bar",
+        "PC版官網右側功能列",
+        "PC版官網會員中心",
+        "PC版官網會員中心側欄",
         "PC版官網儲值與購點",
-        "PC版儲值彈窗 - 一般會員（無進階認證）",
-        "PC版儲值彈窗 - GP點帳進階認證",
-        "PC版儲值彈窗 - 星帳進階認證",
-        "PC版儲值彈窗 - 純點帳進階認證（有手機）",
         "PC版官網客服中心",
     ]
     ordered_features = [f for f in feature_order if f in features] + [f for f in features if f not in feature_order]

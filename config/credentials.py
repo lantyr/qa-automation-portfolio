@@ -41,6 +41,21 @@ def get_star_credentials():
     if not account or not password:
         raise ValueError("缺少星帳帳密，請設定 BEANFUN_STAR_ACCOUNT / BEANFUN_STAR_PASSWORD")
     return account, password
+def get_bf_bound_credentials():
+    """綁bf!點帳（需OTP+選帳號）"""
+    account = os.getenv("BEANFUN_BF_ACCOUNT")
+    password = os.getenv("BEANFUN_BF_PASSWORD")
+    if not account or not password:
+        raise ValueError("缺少綁bf!帳密，請設定 BEANFUN_BF_ACCOUNT / BEANFUN_BF_PASSWORD")
+    return account, password
+
+def get_openid_login_url():
+    """OPEN ID 登入測試 URL（含 OTT，可能過期需更新）"""
+    url = os.getenv("OPENID_LOGIN_URL")
+    if not url:
+        raise ValueError("缺少 OPEN ID URL，請設定 OPENID_LOGIN_URL")
+    return url
+
 def get_pure_verified_credentials():
     """純點帳已綁手機（認證會員），用於 SP-017。"""
     account = os.getenv("BEANFUN_PURE_VERIFIED_ACCOUNT")
