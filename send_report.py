@@ -41,11 +41,16 @@ def _parse_receiver_list(raw: str) -> list[str]:
             out.append(addr)
     return out
 
+def _is_credentials_skip(message: str) -> bool:
+    """帳密未設定的 SKIP → 不顯示在報告、不計入統計。"""
+    return "BEANFUN_" in message and ("缺少" in message or "請設定" in message)
+
+
 def get_detailed_report(results_dir):
     """讀取 Allure JSON 並生成詳細的步驟清單"""
     all_reports = ""
-    summary_data = {"total": 0, "passed": 0, "failed": 0, "skipped": 0}
-    
+    summary_data = {"total": 0, "passed": 0, "failed": 0, "locked": 0}
+
     json_files = glob.glob(os.path.join(results_dir, "*-result.json"))
     if not json_files:
         return "⚠️ 找不到任何測試結果，請確認 pytest 是否執行成功。", summary_data, 0
@@ -103,29 +108,52 @@ def get_detailed_report(results_dir):
     for feature in ordered_features:
         tests = sorted(features[feature], key=lambda t: t.get("name", ""))
         section_title = feature_title_map.get(feature, f"以下為 {feature} 的自動化測試用例結果")
-        all_reports += f"{section_title}\n"
+        section_lines = ""
+        t_idx = 0
 
-        for t_idx, test in enumerate(tests, 1):
+        for test in tests:
+            status = test.get('status', '')
+            skip_message = test.get('statusDetails', {}).get('message', '')
+
+            # 帳密未設定 → 完全不顯示、不計入
+            if status == 'skipped' and _is_credentials_skip(skip_message):
+                continue
+
+            t_idx += 1
             summary_data["total"] += 1
             raw_test_name = test.get("name", "").strip()
             test_name = test_title_map.get(raw_test_name, raw_test_name)
-            # 依新版郵件格式：會員登入功能保留「驗證：」，其餘章節維持原標題文字
-            all_reports += f"{t_idx}. {test_name}\n\n"
-            
-            if test['status'] == 'passed':
+
+            if status == 'passed':
                 summary_data["passed"] += 1
-            elif test['status'] == 'skipped':
-                summary_data["skipped"] += 1
+                section_lines += f"{t_idx}. {test_name}\n\n"
+                for s_idx, step in enumerate(test.get('steps', []), 1):
+                    step_status = "OK" if step['status'] == 'passed' else "Failed"
+                    step_name = step.get("name", "").strip()
+                    step_name = re.sub(r"^步驟\s*\d+\s*:\s*", "", step_name)
+                    step_name = re.sub(r"^\d+\.\s*", "", step_name)
+                    section_lines += f"\t步驟 {s_idx}: {step_name} [{step_status}]\n\n"
+
+            elif status == 'skipped':
+                # 被鎖定（CAPTCHA、429、簡訊上限等）
+                summary_data["locked"] += 1
+                section_lines += f"{t_idx}. 🔒 {test_name}\n"
+                reason = skip_message.strip().split("\n")[0] if skip_message else "環境限制"
+                section_lines += f"\t原因：{reason}\n\n"
+
             else:
+                # failed / broken
                 summary_data["failed"] += 1
-            
-            for s_idx, step in enumerate(test.get('steps', []), 1):
-                step_status = "OK" if step['status'] == 'passed' else "Failed"
-                step_name = step.get("name", "").strip()
-                step_name = re.sub(r"^步驟\s*\d+\s*:\s*", "", step_name)
-                step_name = re.sub(r"^\d+\.\s*", "", step_name)
-                all_reports += f"\t步驟 {s_idx}: {step_name} [{step_status}]\n\n"
-        all_reports += "\n"
+                section_lines += f"{t_idx}. {test_name}\n\n"
+                for s_idx, step in enumerate(test.get('steps', []), 1):
+                    step_status = "OK" if step['status'] == 'passed' else "Failed"
+                    step_name = step.get("name", "").strip()
+                    step_name = re.sub(r"^步驟\s*\d+\s*:\s*", "", step_name)
+                    step_name = re.sub(r"^\d+\.\s*", "", step_name)
+                    section_lines += f"\t步驟 {s_idx}: {step_name} [{step_status}]\n\n"
+
+        if section_lines:
+            all_reports += f"{section_title}\n{section_lines}\n"
 
     success_rate = (summary_data["passed"] / summary_data["total"] * 100) if summary_data["total"] > 0 else 0
     return all_reports, summary_data, success_rate
@@ -187,7 +215,7 @@ def send_email():
     _log("[send_report] 正在生成詳細摘要報告...")
     detailed_text, summary, success_rate = get_detailed_report(results_path)
 
-    status_icon = "✅" if summary["failed"] == 0 else "❌"
+    status_icon = "✅" if summary["failed"] == 0 and summary["locked"] == 0 else "❌"
     subject = f"{status_icon} 官網自動化測試摘要 - 成功率: {success_rate:.0f}%"
 
     msg = MIMEMultipart()
@@ -204,7 +232,7 @@ def send_email():
 📊 數據統計中心：
 ✅ 通過數量：{summary['passed']}
 ❌ 失敗數量：{summary['failed']}
-🔒 環境因素被鎖：{summary['skipped']}
+🔒 被鎖定數量：{summary['locked']}
 📈 總測試數：{summary['total']}
 🏆 最終成功率：{success_rate:.1f}%
 ━━━━━━━━━━━━━━━━━━━━━━━━━━

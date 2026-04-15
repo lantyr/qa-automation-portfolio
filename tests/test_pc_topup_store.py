@@ -360,14 +360,20 @@ class TestPCTopupGeneralMember:
         self.home = HomePage(self.driver)
         self.login = LoginPage(self.driver)
         self.topup = TopupPopupPage(self.driver)
-        account, password = get_pure_credentials()
-        self.home.go_to_home()
-        self.home.click_login_btn()
-        self.login.login_action_pure(account, password)
-        WebDriverWait(self.driver, 20).until(EC.url_contains("beanfun.com"))
-        self.home.handle_alert()
-        self.home.dismiss_blocking_overlays()
-        self.home.go_to_home()
+        try:
+            account, password = get_pure_credentials()
+        except ValueError as e:
+            pytest.skip(str(e))
+        try:
+            self.home.go_to_home()
+            self.home.click_login_btn()
+            self.login.login_action_pure(account, password)
+            WebDriverWait(self.driver, 20).until(EC.url_contains("beanfun.com"))
+            self.home.handle_alert()
+            self.home.dismiss_blocking_overlays()
+            self.home.go_to_home()
+        except Exception as e:
+            pytest.skip(f"純點帳登入失敗，請稍後重試 - {e}")
         yield
         try:
             self.driver.switch_to.default_content()
@@ -595,7 +601,10 @@ class TestPCTopupGPAccount:
         self.home = HomePage(self.driver)
         self.login = LoginPage(self.driver)
         self.topup = TopupPopupPage(self.driver)
-        account, password = get_gp_credentials()
+        try:
+            account, password = get_gp_credentials()
+        except ValueError as e:
+            pytest.skip(str(e))
         otp = get_beanfun_otp()
         try:
             self.home.go_to_home()
@@ -694,7 +703,10 @@ class TestPCTopupStarAccount:
         self.home = HomePage(self.driver)
         self.login = LoginPage(self.driver)
         self.topup = TopupPopupPage(self.driver)
-        account, password = get_star_credentials()
+        try:
+            account, password = get_star_credentials()
+        except ValueError as e:
+            pytest.skip(str(e))
         otp = get_beanfun_otp()
         try:
             self.home.go_to_home()
@@ -725,6 +737,66 @@ class TestPCTopupStarAccount:
         # Test Title: 星帳(2.0)預設進階認證狀態顯示
         # Test Steps:
         #   前提) 已登入星帳（gamaplay788，預設有進階認證）
+        #   1. 開啟儲值與購點彈窗
+        #   2. 切換至彈窗 iframe
+        #   3. 驗證側欄顯示「認證會員」
+        # Expected Result: 側欄顯示認證會員
+
+        with allure.step("1. 開啟儲值與購點彈窗"):
+            self.home.open_topup_popup()
+            _screenshot(self.driver, "步驟1_開啟彈窗")
+
+        with allure.step("2. 切換至彈窗 iframe"):
+            self.topup.switch_to_popup_iframe(_TIMEOUT)
+            self.topup.dismiss_anti_fraud_if_present()
+            _screenshot(self.driver, "步驟2_切換iframe")
+
+        with allure.step("3. 驗證側欄顯示認證會員"):
+            self.topup.assert_verified_member(_TIMEOUT)
+            _screenshot(self.driver, "步驟3_認證會員確認")
+            self.driver.switch_to.default_content()
+
+
+# ════════════════════════════════════════════════════════════════
+# SP-001：純點帳已綁手機（000101）進階認證狀態驗證
+# ════════════════════════════════════════════════════════════════
+@allure.feature("PC版儲值彈窗 - 純點帳進階認證（有手機）")
+class TestPCTopupPureVerifiedAccount:
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, driver):
+        self.driver = driver
+        self.home = HomePage(self.driver)
+        self.login = LoginPage(self.driver)
+        self.topup = TopupPopupPage(self.driver)
+        try:
+            account, password = get_pure_verified_credentials()
+        except ValueError as e:
+            pytest.skip(str(e))
+        try:
+            self.home.go_to_home()
+            self.home.click_login_btn()
+            self.login.login_action_pure(account, password)
+            WebDriverWait(self.driver, 20).until(EC.url_contains("beanfun.com"))
+            self.home.handle_alert()
+            self.home.dismiss_blocking_overlays()
+            self.home.go_to_home()
+        except Exception as e:
+            import pytest as _pytest
+            _pytest.skip(f"被鎖定：純點帳（已綁手機）登入失敗，請稍後重試 - {e}")
+        yield
+        try:
+            self.driver.switch_to.default_content()
+            self.driver.switch_to.alert.accept()
+        except Exception:
+            pass
+
+    @allure.title("TC-PC-SP-001：純點帳進階認證狀態顯示（有手機驗證）")
+    def test_tc_pc_sp_001_pure_verified_member(self):
+        # Test ID: TC-PC-SP-001
+        # Test Title: 純點帳進階認證狀態顯示（有手機驗證）
+        # Test Steps:
+        #   前提) 已登入純點帳且已綁手機（hfivenew-000101，認證會員）
         #   1. 開啟儲值與購點彈窗
         #   2. 切換至彈窗 iframe
         #   3. 驗證側欄顯示「認證會員」
