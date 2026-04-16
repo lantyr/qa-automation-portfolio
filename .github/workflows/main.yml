@@ -48,12 +48,14 @@ jobs:
           BEANFUN_STAR_PASSWORD: ${{ secrets.BEANFUN_STAR_PASSWORD }}
         
       - name: 6. 產生與打包 Allure 報告
+        if: always()
         run: |
           allure generate allure-results -o allure-report --clean
           py -m pip install allure-combine
           allure-combine allure-report
 
       - name: 7. 寄送測試報告
+        if: always()
         env:
           REPORT_SENDER_EMAIL: ${{ secrets.REPORT_SENDER_EMAIL }}
           REPORT_SENDER_PWD: ${{ secrets.REPORT_SENDER_PWD }}
