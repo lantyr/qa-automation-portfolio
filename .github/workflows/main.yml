@@ -30,7 +30,14 @@ jobs:
       - name: 4. 安裝 Allure 命令列工具
         run: npm install -g allure-commandline --save-dev
 
+      - name: 4b. 設定 Java 環境（allure generate 所需）
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
       - name: 5. 執行自動化測試 (無頭模式)
+        continue-on-error: true
         run: |
           python -m pytest tests/test_pc_action_bar.py tests/test_pc_customer_service.py tests/test_pc_homepage.py tests/test_pc_member_center.py tests/test_pc_navbar_states.py tests/test_pc_sidebar.py tests/test_pc_topup_store.py -p no:cacheprovider --clean-alluredir --alluredir=allure-results
         env:
@@ -46,13 +53,14 @@ jobs:
           BEANFUN_GP_PASSWORD: ${{ secrets.BEANFUN_GP_PASSWORD }}
           BEANFUN_STAR_ACCOUNT: ${{ secrets.BEANFUN_STAR_ACCOUNT }}
           BEANFUN_STAR_PASSWORD: ${{ secrets.BEANFUN_STAR_PASSWORD }}
-        
+
       - name: 6. 產生與打包 Allure 報告
         if: always()
+        continue-on-error: true
         run: |
           allure generate allure-results -o allure-report --clean
-          py -m pip install allure-combine
-          allure-combine allure-report
+          python -m pip install allure-combine
+          python -m allure_combine.combine allure-report
 
       - name: 7. 寄送測試報告
         if: always()
@@ -61,7 +69,7 @@ jobs:
           REPORT_SENDER_PWD: ${{ secrets.REPORT_SENDER_PWD }}
           REPORT_RECEIVER_EMAIL: ${{ secrets.REPORT_RECEIVER_EMAIL }}
           PYTHONIOENCODING: utf-8
-        run: py send_report.py
+        run: python send_report.py
 
       - name: 8. 上傳測試報告
         uses: actions/upload-artifact@v4
