@@ -23,7 +23,7 @@ if exist "%~dp0.venv\Scripts\python.exe" (
 )
 
 echo [1/6] pytest + allure-results...
-"%PYEXE%" -m pytest --clean-alluredir --alluredir=allure-results --reruns 1 --reruns-delay 3
+"%PYEXE%" -m pytest tests/test_pc_action_bar.py tests/test_pc_customer_service.py tests/test_pc_homepage.py tests/test_pc_member_center.py tests/test_pc_navbar_states.py tests/test_pc_sidebar.py tests/test_pc_topup_store.py -p no:cacheprovider --clean-alluredir --alluredir=allure-results --reruns 1 --reruns-delay 3
 if errorlevel 1 (
   echo NOTE - pytest had failures, continuing with Allure and email steps
 )
