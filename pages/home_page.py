@@ -135,6 +135,13 @@ class HomePage(BasePage):
         self.check_for_rate_limit()
         self.wait_until_visible(self.LOGO)
 
+    def go_to_home_if_needed(self):
+        """已在首頁則僅檢查 429；否則正常導航至首頁。減少不必要的頁面請求以降低 429 風險。"""
+        if self.driver.current_url.rstrip('/') != self.url.rstrip('/'):
+            self.driver.get(self.url)
+            self.wait_until_visible(self.LOGO)
+        self.check_for_rate_limit()
+
     def open_homepage(self):
         self.driver.get(self.url)
         self.wait_until_visible(self.LOGO)

@@ -1,41 +1,31 @@
 @echo off
-REM ASCII-only lines avoid cmd encoding issues. Task Scheduler: run_tests.bat nopause
+REM Batch 3/3: action_bar + topup_store
+REM NO --clean-alluredir (accumulate results from batches 1+2).
+REM Runs full Allure generate + combine + archive + email after tests.
 setlocal EnableExtensions
 chcp 65001 >nul 2>&1
 cd /d "%~dp0"
 
-REM Same as your Get-Command allure: npm global is under %APPDATA%\npm (allure.cmd).
-REM Task Scheduler / cmd often have a short PATH; prepend so "call allure" works.
 set "PATH=%APPDATA%\npm;%PATH%"
 if exist "%ProgramFiles%\nodejs" set "PATH=%ProgramFiles%\nodejs;%PATH%"
 if exist "%LOCALAPPDATA%\Programs\node" set "PATH=%LOCALAPPDATA%\Programs\node;%PATH%"
 
-echo ===================================================
-echo Daily automation: pytest + Allure + email
-echo Task Scheduler: run_tests.bat nopause
-echo ===================================================
-
 if exist "%~dp0.venv\Scripts\python.exe" (
   set "PYEXE=%~dp0.venv\Scripts\python.exe"
 ) else (
-  echo WARNING: .venv not found, using system py. Run setup_venv.bat first.
   set "PYEXE=py"
 )
 
-echo [1/6] pytest + allure-results...
-REM 第一批：全部測試 + 純點帳 sidebar（--clean-alluredir 清空舊結果）
-"%PYEXE%" -m pytest tests/test_pc_homepage.py tests/test_pc_customer_service.py tests/test_pc_navbar_states.py tests/test_openid_login.py "tests/test_pc_sidebar.py::TestPCMemberCenterPureSidebar" tests/test_pc_action_bar.py tests/test_pc_member_center.py tests/test_pc_topup_store.py -p no:cacheprovider --clean-alluredir --alluredir=allure-results --reruns 1 --reruns-delay 3
+echo ===================================================
+echo Batch 3/3: action_bar + topup_store
+echo ===================================================
+
+"%PYEXE%" -m pytest tests/test_pc_action_bar.py tests/test_pc_topup_store.py -p no:cacheprovider --alluredir=allure-results --reruns 1 --reruns-delay 3
 if errorlevel 1 (
-  echo NOTE - first pytest had failures, continuing...
-)
-REM 第二批：星帳 sidebar（獨立 pytest 呼叫，讓 Chrome 資源完全釋放後再啟動）
-"%PYEXE%" -m pytest "tests/test_pc_sidebar.py::TestPCMemberCenterStarSidebar" -p no:cacheprovider --alluredir=allure-results --reruns 1 --reruns-delay 3
-if errorlevel 1 (
-  echo NOTE - second pytest had failures, continuing with Allure and email steps
+  echo NOTE - Batch 3 had failures, continuing with Allure and email steps
 )
 
 echo [2/6] merge prior Allure history into allure-results for trend widgets...
-REM Copy allure-report\history to allure-results\history before generate.
 if exist "%~dp0allure-report\history" (
   if not exist "%~dp0allure-results\history" mkdir "%~dp0allure-results\history"
   xcopy /E /I /Y "%~dp0allure-report\history\*" "%~dp0allure-results\history\" >nul 2>&1
@@ -59,7 +49,7 @@ if not defined JAVA_HOME (
 if defined JAVA_HOME set "PATH=%JAVA_HOME%\bin;%PATH%"
 call allure generate allure-results -o allure-report --clean
 if errorlevel 1 (
-  echo ERROR: allure generate failed. Install JDK and npm install -g allure-commandline
+  echo ERROR: allure generate failed.
   if /i not "%~1"=="nopause" pause
   exit /b 1
 )
@@ -96,7 +86,7 @@ if "%COMBINED%"=="0" (
   if not errorlevel 1 set "COMBINED=1"
 )
 if "%COMBINED%"=="0" (
-  echo WARNING: allure-combine failed. pip install allure-combine in venv.
+  echo WARNING: allure-combine failed.
 )
 
 echo [5/6] Archive complete.html to HistoryReports...
@@ -106,14 +96,14 @@ if exist "%~dp0allure-report\complete.html" (
   copy /Y "%~dp0allure-report\complete.html" "%~dp0HistoryReports\Report_%MY_DATE%.html" >nul
   echo Archived: %~dp0HistoryReports\Report_%MY_DATE%.html
 ) else (
-  echo WARNING: complete.html missing. Fix step 4.
+  echo WARNING: complete.html missing.
 )
 
 echo [6/6] send_report.py...
 "%PYEXE%" send_report.py
 
 echo ===================================================
-echo Done. Folder: %CD%
+echo All 3 batches complete. Folder: %CD%
 echo ===================================================
 if /i not "%~1"=="nopause" pause
 endlocal

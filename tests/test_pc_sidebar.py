@@ -49,7 +49,11 @@ class TestPCMemberCenterPureSidebar:
         except Exception:
             pass
 
-        self.home.go_to_home()
+        if self.member.is_element_displayed(self.member.POPUP_ROOT, timeout=2):
+            # popup 開啟時 BF_btnMember 被 overlay 遮蔽，直接導航至首頁以重置狀態
+            self.home.go_to_home()
+        else:
+            self.home.go_to_home_if_needed()
 
         if not self.home.is_element_displayed(self.home.LOGOUT_BTN, timeout=3):
             account, password = get_pure_credentials()
@@ -551,8 +555,11 @@ class TestPCMemberCenterStarSidebar:
         except Exception:
             pass
 
-        # 前往首頁
-        self.home.go_to_home()
+        if self.member.is_element_displayed(self.member.POPUP_ROOT, timeout=2):
+            # popup 開啟時 BF_btnMember 被 overlay 遮蔽，直接導航至首頁以重置狀態
+            self.home.go_to_home()
+        else:
+            self.home.go_to_home_if_needed()
 
         # 若尚未登入，執行星帳登入
         if not self.home.is_element_displayed(self.home.LOGOUT_BTN, timeout=3):

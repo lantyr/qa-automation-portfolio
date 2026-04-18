@@ -10,12 +10,6 @@ import config.credentials  # noqa: F401 - 載入 .env
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 
-collect_ignore = [
-    "tests/test_beanfun_home_v2.py",
-    "tests/test_beanfun_member_topup_pc.py",
-    "tests/test_negative_login.py",
-]
-
 
 def pytest_configure(config):
     """將 categories.json 複製至 allure-results，讓 Allure 報告顯示「被鎖定」分類欄位。"""
@@ -24,6 +18,21 @@ def pytest_configure(config):
     src = Path(__file__).parent / "categories.json"
     if src.exists():
         shutil.copy2(src, allure_dir / "categories.json")
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_call(item):
+    """將測試本體中的 Selenium 例外轉為 AssertionError，
+    使 Allure 正確標記為 Failed（紅色）而非 Broken（黃色）。
+    setup/teardown 中的例外不受影響，仍顯示為 Broken。
+    """
+    from selenium.common.exceptions import WebDriverException
+    outcome = yield
+    excinfo = outcome.excinfo
+    if excinfo is not None:
+        _, exc_value, _ = excinfo
+        if isinstance(exc_value, WebDriverException):
+            raise AssertionError(str(exc_value)) from exc_value
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)

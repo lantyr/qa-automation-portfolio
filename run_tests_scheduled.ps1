@@ -35,10 +35,51 @@ if (-not (Test-Path -LiteralPath $py)) {
     $py = 'py'
 }
 
-Append-Log '[1/4] pytest'
-& $py -m pytest --clean-alluredir --alluredir=allure-results 2>&1 | ForEach-Object { Append-Log $_ }
-if ($LASTEXITCODE -ne 0) { Append-Log "NOTE: pytest exit code $LASTEXITCODE (continue)" }
+# [1/7] pytest 第一批：全部測試（純點帳 sidebar）
+Append-Log '[1/7] pytest batch-1'
+& $py -m pytest `
+    tests/test_pc_homepage.py `
+    tests/test_pc_customer_service.py `
+    tests/test_pc_navbar_states.py `
+    tests/test_openid_login.py `
+    "tests/test_pc_sidebar.py::TestPCMemberCenterPureSidebar" `
+    tests/test_pc_action_bar.py `
+    tests/test_pc_member_center.py `
+    tests/test_pc_topup_store.py `
+    -p no:cacheprovider --clean-alluredir --alluredir=allure-results --reruns 1 --reruns-delay 3 `
+    2>&1 | ForEach-Object { Append-Log $_ }
+if ($LASTEXITCODE -ne 0) { Append-Log "NOTE: pytest batch-1 exit code $LASTEXITCODE (continue)" }
 
+# [1b/7] pytest 第二批：星帳 sidebar（獨立呼叫讓 Chrome 資源釋放）
+Append-Log '[1b/7] pytest batch-2 (star sidebar)'
+& $py -m pytest `
+    "tests/test_pc_sidebar.py::TestPCMemberCenterStarSidebar" `
+    -p no:cacheprovider --alluredir=allure-results --reruns 1 --reruns-delay 3 `
+    2>&1 | ForEach-Object { Append-Log $_ }
+if ($LASTEXITCODE -ne 0) { Append-Log "NOTE: pytest batch-2 exit code $LASTEXITCODE (continue)" }
+
+# [2/7] merge prior Allure history into allure-results for trend widgets
+Append-Log '[2/7] merge Allure history'
+$histSrc = Join-Path $root 'allure-report\history'
+$histDst = Join-Path $root 'allure-results\history'
+if (Test-Path -LiteralPath $histSrc) {
+    New-Item -ItemType Directory -Force -Path $histDst | Out-Null
+    Copy-Item -Path "$histSrc\*" -Destination $histDst -Recurse -Force -ErrorAction SilentlyContinue
+    Append-Log 'OK: merged prior history'
+} else {
+    Append-Log 'NOTE: no previous allure-report\history folder'
+}
+
+# [2b/7] copy categories.json
+$catSrc = Join-Path $root 'categories.json'
+$catDst = Join-Path $root 'allure-results\categories.json'
+if (Test-Path -LiteralPath $catSrc) {
+    Copy-Item -LiteralPath $catSrc -Destination $catDst -Force
+    Append-Log 'OK: copied categories.json'
+}
+
+# [3/7] allure generate
+Append-Log '[3/7] allure generate'
 if (-not $env:JAVA_HOME) {
     $jdk = Get-ChildItem 'C:\Program Files\Microsoft\jdk-*' -Directory -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($jdk) {
@@ -46,8 +87,6 @@ if (-not $env:JAVA_HOME) {
         $env:PATH = "$($jdk.FullName)\bin;$env:PATH"
     }
 }
-
-Append-Log '[2/4] allure generate'
 $allureCmd = Get-Command allure -ErrorAction SilentlyContinue
 if (-not $allureCmd) {
     Append-Log 'ERROR: allure not in PATH (Task Scheduler often lacks npm global). Add npm folder to system PATH or install allure-commandline globally.'
@@ -59,20 +98,54 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-Append-Log '[3/4] allure-combine'
+# [4/7] allure-combine
+Append-Log '[4/7] allure-combine'
 $reportDir = Join-Path $root 'allure-report'
 $combineScript = Join-Path $root 'tools\run_allure_combine.py'
-$hasCombine = Get-Command allure-combine -ErrorAction SilentlyContinue
-if ($hasCombine) {
-    & allure-combine $reportDir 2>&1 | ForEach-Object { Append-Log $_ }
-} elseif (Test-Path -LiteralPath $combineScript) {
+$combined = $false
+
+$acExe = Join-Path $root '.venv\Scripts\allure-combine.exe'
+if (Test-Path -LiteralPath $acExe) {
+    & $acExe $reportDir 2>&1 | ForEach-Object { Append-Log $_ }
+    if ($LASTEXITCODE -eq 0) { $combined = $true }
+}
+if (-not $combined) {
+    $acExe2 = Join-Path $root '.venv\Scripts\ac.exe'
+    if (Test-Path -LiteralPath $acExe2) {
+        & $acExe2 $reportDir 2>&1 | ForEach-Object { Append-Log $_ }
+        if ($LASTEXITCODE -eq 0) { $combined = $true }
+    }
+}
+if (-not $combined) {
+    $hasCombine = Get-Command allure-combine -ErrorAction SilentlyContinue
+    if ($hasCombine) {
+        & allure-combine $reportDir 2>&1 | ForEach-Object { Append-Log $_ }
+        if ($LASTEXITCODE -eq 0) { $combined = $true }
+    }
+}
+if (-not $combined -and (Test-Path -LiteralPath $combineScript)) {
     & $py $combineScript $reportDir 2>&1 | ForEach-Object { Append-Log $_ }
-} else {
-    Append-Log 'ERROR: allure-combine not found and tools\run_allure_combine.py missing'
-    exit 1
+    if ($LASTEXITCODE -eq 0) { $combined = $true }
+}
+if (-not $combined) {
+    Append-Log 'WARNING: allure-combine failed. pip install allure-combine in venv.'
 }
 
-Append-Log '[4/4] send_report'
+# [5/7] Archive complete.html to HistoryReports
+Append-Log '[5/7] archive complete.html'
+$histReports = Join-Path $root 'HistoryReports'
+New-Item -ItemType Directory -Force -Path $histReports | Out-Null
+$stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
+$completeHtml = Join-Path $reportDir 'complete.html'
+if (Test-Path -LiteralPath $completeHtml) {
+    Copy-Item -LiteralPath $completeHtml -Destination (Join-Path $histReports "Report_$stamp.html") -Force
+    Append-Log "Archived: HistoryReports\Report_$stamp.html"
+} else {
+    Append-Log 'WARNING: complete.html missing'
+}
+
+# [6/7] send_report
+Append-Log '[6/7] send_report'
 & $py send_report.py 2>&1 | ForEach-Object { Append-Log $_ }
 
 Append-Log "===== DONE $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') ====="

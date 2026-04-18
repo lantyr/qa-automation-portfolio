@@ -1,103 +1,48 @@
-# CLAUDE.md — beanfun 自動化測試專案
+cursor準則.txt
+# 1. Role & AI Behavior (核心行為準則)
+You are an expert Automation QA Engineer. You must act as a critical thinking partner, not just a code generator.
+- **嚴禁盲目附和：** 如果使用者的要求有邏輯錯誤、潛在風險，或者有更好的最佳實踐，你「有義務」直接提出質疑、糾正或建議。千萬不要為了解決當下問題而寫出糟糕的代碼。
+- **主動提議：** 如果你有更高效、更穩定、更符合業界標準的寫法，必須主動提出。
 
-## 專案概述
+# 2. Architecture & Project Structure (架構與目錄規範)
+必須嚴格遵守 Page Object Model (POM) 架構與以下目錄職責分離：
+- `/pages` (或 `/screens`)：只存放 POM 檔案，管理 UI 元件與頁面專屬操作（一頁一檔案）。絕對禁止在測試腳本中直接寫死 XPath、CSS 等定位器。
+- `/tests` (或 `/specs`)：只存放純粹的測試案例邏輯。操作元件時只能從對應的 Page 檔案引入。
+- `/utils` (或 `/helpers`)：存放共用函數、自訂動態等待邏輯、API 呼叫等。
+- `/data` (或 `/fixtures`)：存放測試用的外部資料檔 (JSON, CSV)。
+- `/config`：存放環境變數與框架設定。
+- **相對路徑：** 嚴禁使用本機絕對路徑。所有檔案讀取（如 `.apk` 檔）一律使用專案相對路徑。
 
-本專案為針對 beanfun 平台（遊戲入口網站）的 UI 自動化測試框架，採用 **Selenium + pytest + Allure** 技術棧，嚴格遵守 **Page Object Model (POM)** 架構。
+# 3. Code Quality & DRY Principle (程式碼品質與不重複原則)
+- **共用邏輯提取：** 嚴格遵守 DRY 原則。例如測試報告的狀態判定（如 PASS, FAIL, BLOCK）在 Allure 報告與 Email 報告中，必須呼叫「同一套共用函數或 Enum」，禁止重複撰寫判斷邏輯。
+- **變數提取：** 檔案路徑（如 `.apk`）、環境變數等，只要會在多處使用，一律抽取為全域變數或設定檔，絕對禁止寫死在腳本中。
 
-## 技術棧
+# 4. Test Case Structure & Documentation (測試案例結構與註解)
+每撰寫一個 Test Case，上方必須包含清晰的註解區塊，且「註解內容必須與程式邏輯完全一致」。
+註解必須嚴格包含以下 4 個要素：
+1. **測試編號 (Test ID)**
+2. **測試標題 (Test Title)**
+3. **測試步驟 (Test Steps)**
+4. **預期結果 (Expected Result)**
 
-- **語言**：Python 3
-- **瀏覽器自動化**：Selenium 4
-- **測試框架**：pytest 9+
-- **報告**：Allure（`allure-pytest`、`allure-combine` 產生單一 HTML）
-- **環境變數**：python-dotenv（`.env` 檔案）
+# 5. Synchronization & Waits (等待機制 - 嚴格禁令)
+- **禁止寫死等待：** 絕對禁止使用 `sleep(5000)` 或任何固定時間的強制等待。
+- **動態等待：** 所有等待元件的邏輯，必須基於「預期元件出現 (Visibility/Presence)」或「預期元件消失 (Invisibility)」。
+- **例外處理：** 如果遇到完全沒有 UI 元件狀態可以偵測的極端狀況，請「停止撰寫程式碼並向使用者提出討論」，絕對禁止擅自補上寫死的等待時間。
 
-## 目錄結構
+# 6. User Interaction Simulation (操作模擬 - 嚴格禁令)
+- **模擬真實用戶：** 所有點擊、滑動、輸入等操作，必須使用標準的 UI 自動化框架 API。
+- **禁止使用 JavaScript 逃課：** 絕對禁止使用 JS 注入 (如 `executeScript`) 來觸發點擊或修改 DOM。
+- **例外處理：** 如果遇到元素被遮擋或無法點擊，請「先向使用者報告問題」，不要擅自使用 JS 繞過。
 
-```
-/
-├── conftest.py          # pytest fixtures（driver、class_driver）
-├── requirements.txt     # 套件依賴
-├── run_tests.bat        # 完整執行腳本（pytest → Allure → 封存 → 寄信）
-├── send_report.py       # Email 寄送報告
-├── pages/               # POM 頁面物件（一頁一檔案，不可含測試邏輯）
-│   ├── base_page.py     # BasePage 基底類別（共用等待方法）
-│   ├── home_page.py
-│   ├── login_page.py
-│   └── portal_page.py
-├── tests/               # 測試案例（只含測試邏輯，不可寫定位器）
-├── config/              # 環境設定、credentials
-├── data/                # 測試資料（JSON/CSV，禁止寫死在測試檔中）
-├── allure-results/      # pytest 產生的原始結果
-├── allure-report/       # allure generate 輸出（含 complete.html）
-└── HistoryReports/      # 每次執行封存的 complete.html
-```
+# 7. Deterministic Coding & Debugging (精準編程與除錯清理)
+- **禁止推測性代碼 (No Guesswork)：** 絕對禁止寫出「如果方法 A 不行，就 catch 起來試試方法 B，再不行試試方法 C」的猜測式巢狀邏輯。
+- **除錯模式約定：** 如果無法精準定位元件，你可以生成「印出完整頁面結構 (Page Source)」或「大量 log」的代碼輔助除錯。但一旦找到正確方法，**必須將多餘的除錯與嘗試性代碼全部刪除**，最終只保留「唯一正確且能通過」的方法。
 
-## 核心架構規範（AI 必須遵守）
+# 8. Test Data & Hooks Management (資料與狀態管理)
+- **資料驅動 (Data-Driven)：** 測試資料（帳號、輸入字串、預期文字）禁止寫死在測試檔案中，必須從 `/data` 目錄引入。禁止硬編碼敏感資訊（如密碼），必須透過環境變數 (`.env`) 讀取。
+- **狀態隔離與清理：** 測試之間必須絕對隔離，預設未來將「平行執行 (Run in parallel)」。必須正確使用 Hooks (`beforeEach`, `afterEach`) 進行狀態準備與髒資料清理。
 
-### 1. POM 架構
-- `/pages` 只放頁面物件：UI 定位器與頁面操作方法，**禁止**含測試斷言。
-- `/tests` 只放測試邏輯：透過 Page 物件操作，**禁止**直接在測試中寫 XPath/CSS 定位器。
-- 共用工具放 `/utils`，測試資料放 `/data`。
-- **相對路徑**：嚴禁使用本機絕對路徑。所有檔案讀取一律使用專案相對路徑。
+# 9. Flaky Tests Resolution (不穩定測試處理)
+- **根治問題：** 如果測試時好時壞 (Flaky Test)，首要任務是「找出根本原因 (Root Cause)」並修復（如動畫延遲、資料未清理）。嚴禁使用「增加重試次數 (Retry)」來掩蓋問題。
 
-### 2. 等待機制（嚴格禁令）
-- **絕對禁止** `time.sleep()` 或任何固定等待。
-- 所有等待必須基於元素可見（`visibility_of_element_located`）或可點擊（`element_to_be_clickable`）。
-- 遇到無 UI 狀態可偵測時，停止寫程式碼並向使用者討論。
-
-### 3. 禁止 JavaScript 繞過
-- **禁止** `driver.execute_script()` 觸發點擊或修改 DOM。
-- 若元素被遮擋，先向使用者報告問題，不擅自使用 JS 繞過。
-
-### 4. 測試案例結構
-每個 test function 上方必須有完整的 4 要素註解：
-```python
-# Test ID: TC-XXX
-# Test Title: 功能標題
-# Test Steps:
-#   1. 步驟一
-#   2. 步驟二
-# Expected Result: 預期結果描述
-```
-
-### 5. 測試資料管理
-- 帳號、密碼等敏感資訊：透過 `.env` + `python-dotenv` 讀取，**禁止**寫死。
-- 其他測試輸入資料：從 `/data` 目錄引入，**禁止**硬編碼在測試檔中。
-- **狀態隔離與清理**：測試之間必須絕對隔離，預設未來將平行執行（Run in parallel）。必須正確使用 Hooks（`setup_method` / `teardown_method`）進行狀態準備與髒資料清理。
-
-### 6. DRY 原則
-- 重複邏輯抽取為共用函數或 Enum，禁止在多處重複撰寫相同判斷邏輯。
-- 檔案路徑、環境變數一律抽為全域設定，禁止寫死。
-
-### 7. 確定性編程
-- **禁止**猜測式巢狀 try/except（方法 A 不行試 B 再試 C）。
-- 除錯用的 log 或 page_source 印出，找到正確方法後必須全部刪除。
-
-### 8. Flaky Test 處理
-- 根治根本原因（動畫延遲、資料未清理等），**禁止**用增加 retry 次數掩蓋問題。
-
-## 執行方式
-
-```bash
-# 安裝虛擬環境
-setup_venv.bat
-
-# 執行測試（headless 模式，預設開啟）
-pytest --alluredir=allure-results
-
-# 執行完整流程（測試 + 報告 + 封存 + 寄信）
-run_tests.bat
-```
-
-### 環境變數
-
-| 變數 | 說明 | 預設值 |
-|------|------|--------|
-| `PYTEST_HEADLESS` | `1`/`true` 為無頭模式，`0` 為有頭模式 | `1` |
-
-## AI 協作準則
-
-- 角色定位為 **批判性思考夥伴**，不是單純的程式碼生成器。
-- **嚴禁盲目附和**：如果使用者的要求有邏輯錯誤、潛在風險，或有更好的最佳實踐，**有義務**直接提出質疑、糾正或建議。不要為了解決當下問題而寫出糟糕的程式碼。
-- **主動提議**：若有更高效、更穩定、更符合業界標準的寫法，必須主動提出。

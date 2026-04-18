@@ -67,6 +67,7 @@ def _screenshot(driver, name: str) -> None:
 @allure.feature("PC版官網儲值與購點")
 @pytest.mark.usefixtures("class_driver")
 class TestPCTopupStore:
+    _login_ok = False
 
     @pytest.fixture(autouse=True)
     def _inject(self, class_driver):
@@ -74,6 +75,11 @@ class TestPCTopupStore:
         self.home = HomePage(self.driver)
         self.login = LoginPage(self.driver)
         self.topup = TopupPopupPage(self.driver)
+
+    def _require_logged_in(self):
+        """確認 class_driver 已登入，否則標記為被鎖定跳過。"""
+        if not TestPCTopupStore._login_ok:
+            pytest.skip("被鎖定：登入 session 未建立（簡訊上限或機器人驗證），請稍後重試")
 
     # ────────────────────────────────────────────────────────────
     # TC-PC-SP-001
@@ -125,6 +131,7 @@ class TestPCTopupStore:
         with allure.step("4. 驗證帳號資訊區剩餘點數可見"):
             self.topup.assert_remaining_points_visible(_TIMEOUT)
             _screenshot(self.driver, "步驟4_剩餘點數可見")
+            TestPCTopupStore._login_ok = True
 
     # ────────────────────────────────────────────────────────────
     # TC-PC-SP-002
@@ -184,6 +191,7 @@ class TestPCTopupStore:
         #   1. 於已開啟的儲值彈窗，切換至功能操作區域
         #   2. 驗證左側帳號資訊區的「當前點數」數值可見
         # Expected Result: 帳號資訊區「當前點數」可見
+        self._require_logged_in()
 
         with allure.step("1. 於已開啟的儲值彈窗，切換至功能操作區域"):
             self.topup.switch_to_popup_iframe(_TIMEOUT)
@@ -206,6 +214,7 @@ class TestPCTopupStore:
         #   2. 點擊左側導覽「購買點數」
         #   3. 驗證支付方式選擇容器（div.type-btns）可見
         # Expected Result: 購買點數頁已解鎖，信用卡／讀卡機轉帳／橘子支付選項顯示
+        self._require_logged_in()
 
         with allure.step("0. 確認已登入"):
             self.driver.switch_to.default_content()
@@ -252,6 +261,14 @@ class TestPCTopupStore:
         #   1. 在儲值頁面左側導覽列，點擊「儲值記錄」選項
         #   2. 驗證「儲值記錄」頁面內容載入
         # Expected Result: 「儲值記錄」頁面主要內容可見
+        self._require_logged_in()
+
+        with allure.step("0. 開啟儲值彈窗並切換至 iframe"):
+            self.driver.switch_to.default_content()
+            self.home.go_to_home()
+            self.home.open_topup_popup()
+            self.topup.switch_to_popup_iframe(_TIMEOUT)
+            self.topup.dismiss_anti_fraud_if_present()
 
         with allure.step("1. 點擊儲值記錄"):
             self.topup.expand_query_records(_TIMEOUT)
@@ -261,6 +278,7 @@ class TestPCTopupStore:
         with allure.step("2. 驗證頁面內容載入"):
             self.topup.assert_page_content_loaded(_TIMEOUT)
             _screenshot(self.driver, "步驟2_儲值記錄頁面內容")
+            self.driver.switch_to.default_content()
 
     # ────────────────────────────────────────────────────────────
     # TC-PC-SP-010
@@ -273,6 +291,14 @@ class TestPCTopupStore:
         #   1. 在儲值頁面左側導覽列，點擊「消費記錄」選項
         #   2. 驗證「消費記錄」頁面內容載入
         # Expected Result: 「消費記錄」頁面主要內容可見
+        self._require_logged_in()
+
+        with allure.step("0. 開啟儲值彈窗並切換至 iframe"):
+            self.driver.switch_to.default_content()
+            self.home.go_to_home()
+            self.home.open_topup_popup()
+            self.topup.switch_to_popup_iframe(_TIMEOUT)
+            self.topup.dismiss_anti_fraud_if_present()
 
         with allure.step("1. 點擊消費記錄"):
             self.topup.expand_query_records(_TIMEOUT)
@@ -282,6 +308,7 @@ class TestPCTopupStore:
         with allure.step("2. 驗證頁面內容載入"):
             self.topup.assert_page_content_loaded(_TIMEOUT)
             _screenshot(self.driver, "步驟2_消費記錄頁面內容")
+            self.driver.switch_to.default_content()
 
     # ────────────────────────────────────────────────────────────
     # TC-PC-SP-011
@@ -294,6 +321,14 @@ class TestPCTopupStore:
         #   1. 在儲值頁面左側導覽列，點擊「遊戲專用點數」選項
         #   2. 驗證「遊戲專用點數」頁面內容載入
         # Expected Result: 「遊戲專用點數」頁面主要內容可見
+        self._require_logged_in()
+
+        with allure.step("0. 開啟儲值彈窗並切換至 iframe"):
+            self.driver.switch_to.default_content()
+            self.home.go_to_home()
+            self.home.open_topup_popup()
+            self.topup.switch_to_popup_iframe(_TIMEOUT)
+            self.topup.dismiss_anti_fraud_if_present()
 
         with allure.step("1. 點擊遊戲專用點數"):
             self.topup.expand_query_records(_TIMEOUT)
@@ -303,6 +338,7 @@ class TestPCTopupStore:
         with allure.step("2. 驗證頁面內容載入"):
             self.topup.assert_page_content_loaded(_TIMEOUT)
             _screenshot(self.driver, "步驟2_遊戲專用點數頁面內容")
+            self.driver.switch_to.default_content()
 
     # ────────────────────────────────────────────────────────────
     # TC-PC-SP-012
@@ -315,6 +351,14 @@ class TestPCTopupStore:
         #   1. 在儲值頁面左側導覽列，點擊「最近儲值記錄」選項
         #   2. 驗證「最近儲值記錄」頁面內容載入
         # Expected Result: 「最近儲值記錄」頁面主要內容可見
+        self._require_logged_in()
+
+        with allure.step("0. 開啟儲值彈窗並切換至 iframe"):
+            self.driver.switch_to.default_content()
+            self.home.go_to_home()
+            self.home.open_topup_popup()
+            self.topup.switch_to_popup_iframe(_TIMEOUT)
+            self.topup.dismiss_anti_fraud_if_present()
 
         with allure.step("1. 點擊最近儲值記錄"):
             self.topup.expand_query_records(_TIMEOUT)
@@ -324,6 +368,7 @@ class TestPCTopupStore:
         with allure.step("2. 驗證頁面內容載入"):
             self.topup.assert_page_content_loaded(_TIMEOUT)
             _screenshot(self.driver, "步驟2_最近儲值記錄頁面內容")
+            self.driver.switch_to.default_content()
 
     # ────────────────────────────────────────────────────────────
     # TC-PC-SP-013
@@ -336,6 +381,14 @@ class TestPCTopupStore:
         #   1. 在儲值頁面左側導覽列，點擊「計費設定」選項
         #   2. 驗證「計費設定」頁面內容載入
         # Expected Result: 「計費設定」頁面主要內容可見
+        self._require_logged_in()
+
+        with allure.step("0. 開啟儲值彈窗並切換至 iframe"):
+            self.driver.switch_to.default_content()
+            self.home.go_to_home()
+            self.home.open_topup_popup()
+            self.topup.switch_to_popup_iframe(_TIMEOUT)
+            self.topup.dismiss_anti_fraud_if_present()
 
         with allure.step("1. 點擊計費設定"):
             self.topup.click_nav_item(TopupPopupPage.NAV_BILLING)
@@ -344,6 +397,7 @@ class TestPCTopupStore:
         with allure.step("2. 驗證頁面內容載入"):
             self.topup.assert_page_content_loaded(_TIMEOUT)
             _screenshot(self.driver, "步驟2_計費設定頁面內容")
+            self.driver.switch_to.default_content()
 
 
 # ════════════════════════════════════════════════════════════════
@@ -442,6 +496,7 @@ class TestPCTopupGeneralMember:
     # TC-PC-SP-006
     # ────────────────────────────────────────────────────────────
     @allure.title("TC-PC-SP-006：序號儲值頁顯示（未解鎖）")
+    @pytest.mark.skip(reason="頁面已移除「序號儲值」導覽項目 (2026-04 確認)")
     def test_tc_pc_sp_006_serial_topup_locked(self):
         # Test ID: TC-PC-SP-006
         # Test Title: 序號儲值頁顯示（未解鎖）
@@ -501,6 +556,7 @@ class TestPCTopupSerialUnlocked:
     # TC-PC-SP-008
     # ────────────────────────────────────────────────────────────
     @allure.title("TC-PC-SP-008：序號儲值頁顯示（已解鎖）")
+    @pytest.mark.skip(reason="頁面已移除「序號儲值」導覽項目 (2026-04 確認)")
     def test_tc_pc_sp_008_serial_topup_unlocked(self):
         # Test ID: TC-PC-SP-008
         # Test Title: 序號儲值頁顯示（已解鎖）
@@ -761,7 +817,7 @@ class TestPCTopupStarAccount:
 # SP-001：純點帳已綁手機（000101）進階認證狀態驗證
 # ════════════════════════════════════════════════════════════════
 @allure.feature("PC版儲值彈窗 - 純點帳進階認證（有手機）")
-class TestPCTopupPureVerifiedAccount:
+class TestPCTopupPureVerifiedSP001:
 
     @pytest.fixture(autouse=True)
     def _setup(self, driver):
