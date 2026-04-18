@@ -1,105 +1,105 @@
-name: 每日官網自動化測試
+# name: 每日官網自動化測試
 
-on:
-  schedule:
-    - cron: '30 23 * * *'
-  workflow_dispatch:
+# on:
+#   schedule:
+#     - cron: '30 23 * * *'
+#   workflow_dispatch:
 
-jobs:
-  run-auto-test:
-    runs-on: windows-latest 
+# jobs:
+#   run-auto-test:
+#     runs-on: windows-latest 
 
-    steps:
-      - name: 0. 清除舊的快取檔案
-        run: |
-          # 使用相對路徑或內建變數，不要寫死 C:\Users\...
-          if (Test-Path ".pytest_cache") {
-            Remove-Item -Recurse -Force ".pytest_cache"
-          }
-        shell: powershell
-        continue-on-error: true
+#     steps:
+#       - name: 0. 清除舊的快取檔案
+#         run: |
+#           # 使用相對路徑或內建變數，不要寫死 C:\Users\...
+#           if (Test-Path ".pytest_cache") {
+#             Remove-Item -Recurse -Force ".pytest_cache"
+#           }
+#         shell: powershell
+#         continue-on-error: true
 
-      - name: 1. 取得最新程式碼
-        uses: actions/checkout@v4
-        with:
-          clean: false
+#       - name: 1. 取得最新程式碼
+#         uses: actions/checkout@v4
+#         with:
+#           clean: false
 
-      - name: 3. 安裝 Python 依賴套件
-        run: python -m pip install -r requirements.txt
+#       - name: 3. 安裝 Python 依賴套件
+#         run: python -m pip install -r requirements.txt
 
-      - name: 4. 安裝 Allure 命令列工具
-        run: npm install -g allure-commandline --save-dev
+#       - name: 4. 安裝 Allure 命令列工具
+#         run: npm install -g allure-commandline --save-dev
 
-      - name: 4a. 還原 Allure history 快取（趨勢圖用）
-        uses: actions/cache@v4
-        with:
-          path: allure-report/history
-          key: allure-history-${{ github.run_id }}
-          restore-keys: allure-history-
+#       - name: 4a. 還原 Allure history 快取（趨勢圖用）
+#         uses: actions/cache@v4
+#         with:
+#           path: allure-report/history
+#           key: allure-history-${{ github.run_id }}
+#           restore-keys: allure-history-
 
-      - name: 4b. 設定 Java 環境（allure generate 所需）
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
+#       - name: 4b. 設定 Java 環境（allure generate 所需）
+#         uses: actions/setup-java@v4
+#         with:
+#           distribution: temurin
+#           java-version: '17'
 
-      - name: 5. 執行自動化測試 (無頭模式)
-        continue-on-error: true
-        run: |
-          python -m pytest tests/test_pc_action_bar.py tests/test_pc_customer_service.py tests/test_pc_homepage.py tests/test_pc_member_center.py tests/test_pc_navbar_states.py tests/test_pc_sidebar.py tests/test_pc_topup_store.py -p no:cacheprovider --clean-alluredir --alluredir=allure-results --reruns 1 --reruns-delay 3
-        env:
-          # 務必確保這裡有從 Secrets 讀取帳密，否則無頭模式下登入會失敗
-          BEANFUN_TEST_ACCOUNT: ${{ secrets.BEANFUN_TEST_ACCOUNT }}
-          BEANFUN_TEST_PASSWORD: ${{ secrets.BEANFUN_TEST_PASSWORD }}
-          BEANFUN_TEST_OTP: ${{ secrets.BEANFUN_TEST_OTP }}
-          BEANFUN_PURE_ACCOUNT: ${{ secrets.BEANFUN_PURE_ACCOUNT }}
-          BEANFUN_PURE_PASSWORD: ${{ secrets.BEANFUN_PURE_PASSWORD }}
-          BEANFUN_PURE_VERIFIED_ACCOUNT: ${{ secrets.BEANFUN_PURE_VERIFIED_ACCOUNT }}
-          BEANFUN_PURE_VERIFIED_PASSWORD: ${{ secrets.BEANFUN_PURE_VERIFIED_PASSWORD }}
-          BEANFUN_GP_ACCOUNT: ${{ secrets.BEANFUN_GP_ACCOUNT }}
-          BEANFUN_GP_PASSWORD: ${{ secrets.BEANFUN_GP_PASSWORD }}
-          BEANFUN_STAR_ACCOUNT: ${{ secrets.BEANFUN_STAR_ACCOUNT }}
-          BEANFUN_STAR_PASSWORD: ${{ secrets.BEANFUN_STAR_PASSWORD }}
+#       - name: 5. 執行自動化測試 (無頭模式)
+#         continue-on-error: true
+#         run: |
+#           python -m pytest tests/test_pc_action_bar.py tests/test_pc_customer_service.py tests/test_pc_homepage.py tests/test_pc_member_center.py tests/test_pc_navbar_states.py tests/test_pc_sidebar.py tests/test_pc_topup_store.py -p no:cacheprovider --clean-alluredir --alluredir=allure-results --reruns 1 --reruns-delay 3
+#         env:
+#           # 務必確保這裡有從 Secrets 讀取帳密，否則無頭模式下登入會失敗
+#           BEANFUN_TEST_ACCOUNT: ${{ secrets.BEANFUN_TEST_ACCOUNT }}
+#           BEANFUN_TEST_PASSWORD: ${{ secrets.BEANFUN_TEST_PASSWORD }}
+#           BEANFUN_TEST_OTP: ${{ secrets.BEANFUN_TEST_OTP }}
+#           BEANFUN_PURE_ACCOUNT: ${{ secrets.BEANFUN_PURE_ACCOUNT }}
+#           BEANFUN_PURE_PASSWORD: ${{ secrets.BEANFUN_PURE_PASSWORD }}
+#           BEANFUN_PURE_VERIFIED_ACCOUNT: ${{ secrets.BEANFUN_PURE_VERIFIED_ACCOUNT }}
+#           BEANFUN_PURE_VERIFIED_PASSWORD: ${{ secrets.BEANFUN_PURE_VERIFIED_PASSWORD }}
+#           BEANFUN_GP_ACCOUNT: ${{ secrets.BEANFUN_GP_ACCOUNT }}
+#           BEANFUN_GP_PASSWORD: ${{ secrets.BEANFUN_GP_PASSWORD }}
+#           BEANFUN_STAR_ACCOUNT: ${{ secrets.BEANFUN_STAR_ACCOUNT }}
+#           BEANFUN_STAR_PASSWORD: ${{ secrets.BEANFUN_STAR_PASSWORD }}
 
-      - name: 6. 合併 Allure history（保留趨勢圖）
-        if: always()
-        continue-on-error: true
-        run: |
-          if (Test-Path "allure-report/history") {
-            New-Item -ItemType Directory -Force -Path "allure-results/history" | Out-Null
-            Copy-Item -Recurse -Force "allure-report/history/*" "allure-results/history/"
-            Write-Host "OK: merged prior history"
-          } else {
-            Write-Host "NOTE: no previous allure-report/history folder"
-          }
+#       - name: 6. 合併 Allure history（保留趨勢圖）
+#         if: always()
+#         continue-on-error: true
+#         run: |
+#           if (Test-Path "allure-report/history") {
+#             New-Item -ItemType Directory -Force -Path "allure-results/history" | Out-Null
+#             Copy-Item -Recurse -Force "allure-report/history/*" "allure-results/history/"
+#             Write-Host "OK: merged prior history"
+#           } else {
+#             Write-Host "NOTE: no previous allure-report/history folder"
+#           }
 
-      - name: 7. 產生與打包 Allure 報告
-        if: always()
-        continue-on-error: true
-        run: |
-          allure generate allure-results -o allure-report --clean
-          python -m pip install allure-combine
-          python -m allure_combine.combine allure-report
+#       - name: 7. 產生與打包 Allure 報告
+#         if: always()
+#         continue-on-error: true
+#         run: |
+#           allure generate allure-results -o allure-report --clean
+#           python -m pip install allure-combine
+#           python -m allure_combine.combine allure-report
 
-      - name: 8. 寄送測試報告
-        if: always()
-        env:
-          REPORT_SENDER_EMAIL: ${{ secrets.REPORT_SENDER_EMAIL }}
-          REPORT_SENDER_PWD: ${{ secrets.REPORT_SENDER_PWD }}
-          REPORT_RECEIVER_EMAIL: ${{ secrets.REPORT_RECEIVER_EMAIL }}
-          PYTHONIOENCODING: utf-8
-        run: python send_report.py
+#       - name: 8. 寄送測試報告
+#         if: always()
+#         env:
+#           REPORT_SENDER_EMAIL: ${{ secrets.REPORT_SENDER_EMAIL }}
+#           REPORT_SENDER_PWD: ${{ secrets.REPORT_SENDER_PWD }}
+#           REPORT_RECEIVER_EMAIL: ${{ secrets.REPORT_RECEIVER_EMAIL }}
+#           PYTHONIOENCODING: utf-8
+#         run: python send_report.py
 
-      - name: 9. 儲存 Allure history 快取（供下次使用）
-        uses: actions/cache/save@v4
-        if: always()
-        with:
-          path: allure-report/history
-          key: allure-history-${{ github.run_id }}
+#       - name: 9. 儲存 Allure history 快取（供下次使用）
+#         uses: actions/cache/save@v4
+#         if: always()
+#         with:
+#           path: allure-report/history
+#           key: allure-history-${{ github.run_id }}
 
-      - name: 10. 上傳測試報告
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: allure-cloud-report
-          path: allure-report/
+#       - name: 10. 上傳測試報告
+#         uses: actions/upload-artifact@v4
+#         if: always()
+#         with:
+#           name: allure-cloud-report
+#           path: allure-report/
