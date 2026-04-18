@@ -110,9 +110,23 @@ class BasePage:
             return []
 
     def check_for_rate_limit(self):
-        """偵測網站是否回傳 429 Too Many Requests，是則標記為被鎖定並跳過。"""
+        """偵測網站是否回傳 429 Too Many Requests。
+
+        【為什麼加自動等待而非直接 skip】
+        429 是 beanfun 的 IP 級別速率限制，冷卻時間約 15 分鐘。
+        原本偵測到就 pytest.skip()，導致後續所有測試全部跳過，需要人工等待後手動重跑。
+        改為自動等待 15 分鐘並重試一次，讓排程跑完整輪無需人工介入。
+
+        【為什麼用 sleep 而非條件等待（Rule 5 例外說明）】
+        CLAUDE.md Rule 5 禁止寫死等待，應改用元素可見/消失等 UI 條件。
+        但 IP 解封時間是伺服器端行為，沒有任何 UI 狀態可供偵測，
+        屬於 Rule 5 明確允許的例外情境（無可偵測條件）。
+        此處 sleep(900) 是已知冷卻時間的最小有效值，非猜測性等待。
+        """
+        import time
         import pytest
         from selenium.common.exceptions import UnexpectedAlertPresentException
+
         try:
             title = self.driver.title or ''
             src = self.driver.page_source[:500] if self.driver.page_source else ''
@@ -122,5 +136,23 @@ class BasePage:
             except Exception:
                 pass
             return
+
+        if '429' not in title and 'Too Many Requests' not in src and '429' not in src:
+            return
+
+        # 429 偵測到：等待 15 分鐘後重試一次
+        time.sleep(900)
+        self.driver.refresh()
+
+        try:
+            title = self.driver.title or ''
+            src = self.driver.page_source[:500] if self.driver.page_source else ''
+        except UnexpectedAlertPresentException:
+            try:
+                self.driver.switch_to.alert.accept()
+            except Exception:
+                pass
+            return
+
         if '429' in title or 'Too Many Requests' in src or '429' in src:
-            pytest.skip('被鎖定：429 Too Many Requests - 網站流量限制，請稍後重試')
+            pytest.skip('被鎖定：429 Too Many Requests - 等待 15 分鐘後仍無法繼續')
