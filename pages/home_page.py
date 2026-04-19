@@ -35,6 +35,9 @@ class HomePage(BasePage):
     # --- 登入 / 登出 ---
     LOGIN_BTN  = (By.ID, "BF_anchorLoginBtn")
     LOGOUT_BTN = (By.ID, "BF_btnLogout")
+    # 登出確認彈窗（在 iframe#fbContent 內）- OkButton 確認登出
+    LOGOUT_CONFIRM_IFRAME = (By.ID, "fbContent")
+    LOGOUT_CONFIRM_OK = (By.CSS_SELECTOR, "li.OkButton a")
 
     # --- 右側導覽列按鈕（BF_divRightButtons） ---
     SIGNUP_BTN = (By.ID, "BF_btnSignup")   # 申請帳號

@@ -495,17 +495,17 @@ class TestPCTopupGeneralMember:
     # ────────────────────────────────────────────────────────────
     # TC-PC-SP-006
     # ────────────────────────────────────────────────────────────
-    @allure.title("TC-PC-SP-006：序號儲值頁顯示（未解鎖）")
-    @pytest.mark.skip(reason="頁面已移除「序號儲值」導覽項目 (2026-04 確認)")
+    @allure.title("TC-PC-SP-006：儲值彈窗側欄顯示一般會員")
     def test_tc_pc_sp_006_serial_topup_locked(self):
         # Test ID: TC-PC-SP-006
-        # Test Title: 序號儲值頁顯示（未解鎖）
+        # Test Title: 儲值彈窗側欄顯示一般會員
         # Test Steps:
-        #   前提) 已登入一般會員帳號
+        #   前提) 已登入一般會員帳號（純點帳 hfivenew，未進階認證）
         #   1. 開啟儲值彈窗，切換至 iframe
-        #   2. 點擊左側導覽「序號儲值」
-        #   3. 驗證顯示「前往認證」按鈕（未解鎖提示）
-        # Expected Result: 序號儲值頁顯示進階認證提示，「前往認證」按鈕可見
+        #   2. 驗證左側側欄顯示「一般會員」
+        # Expected Result: Remain_point1_lblVerifiedMember 文字包含「一般會員」
+        # 【異動說明】序號儲值導覽項目已由 JS 隱藏（IsWhiteList=false），
+        #   改為驗證彈窗側欄正確顯示帳號認證狀態
 
         with allure.step("1. 開啟彈窗並切換至 iframe"):
             self.home.open_topup_popup()
@@ -513,13 +513,9 @@ class TestPCTopupGeneralMember:
             self.topup.dismiss_anti_fraud_if_present()
             _screenshot(self.driver, "步驟1_切換iframe")
 
-        with allure.step("2. 點擊序號儲值導覽"):
-            self.topup.click_nav_serial_topup(_TIMEOUT)
-            _screenshot(self.driver, "步驟2_點擊序號儲值")
-
-        with allure.step("3. 驗證未解鎖提示出現"):
-            self.topup.assert_serial_topup_locked(_TIMEOUT)
-            _screenshot(self.driver, "步驟3_未解鎖提示")
+        with allure.step("2. 驗證側欄顯示一般會員"):
+            self.topup.assert_general_member(_TIMEOUT)
+            _screenshot(self.driver, "步驟2_一般會員確認")
             self.driver.switch_to.default_content()
 
 
@@ -537,35 +533,35 @@ class TestPCTopupSerialUnlocked:
         self.home = HomePage(self.driver)
         self.login = LoginPage(self.driver)
         self.topup = TopupPopupPage(self.driver)
-        account, password = require_beanfun_credentials()
-        otp = get_beanfun_otp()
+        try:
+            account, password = get_pure_verified_credentials()
+        except ValueError as e:
+            pytest.skip(str(e))
         try:
             self.home.go_to_home()
             self.home.click_login_btn()
-            self.login.login_action(account, password)
-            self.login.fill_otp_code(otp)
-            self.login.click_final_confirm()
+            self.login.login_action_pure(account, password)
             WebDriverWait(driver, 20).until(EC.url_contains("beanfun.com"))
             self.home.handle_alert()
             self.home.dismiss_blocking_overlays()
             self.home.go_to_home()
         except Exception as e:
-            pytest.skip(f"登入失敗，請稍後重試：{e}")
+            pytest.skip(f"認證帳號登入失敗，請稍後重試：{e}")
 
     # ────────────────────────────────────────────────────────────
     # TC-PC-SP-008
     # ────────────────────────────────────────────────────────────
-    @allure.title("TC-PC-SP-008：序號儲值頁顯示（已解鎖）")
-    @pytest.mark.skip(reason="頁面已移除「序號儲值」導覽項目 (2026-04 確認)")
+    @allure.title("TC-PC-SP-008：儲值彈窗側欄顯示認證會員")
     def test_tc_pc_sp_008_serial_topup_unlocked(self):
         # Test ID: TC-PC-SP-008
-        # Test Title: 序號儲值頁顯示（已解鎖）
+        # Test Title: 儲值彈窗側欄顯示認證會員
         # Test Steps:
-        #   前提) 已登入認證會員帳號
-        #   1. 開啟儲值與購點彈窗，切換至 iframe
-        #   2. 點擊左側導覽「序號儲值」
-        #   3. 驗證「前往認證」連結不存在（已解鎖）
-        # Expected Result: lnkAdvancedVerify 不存在，頁面正常載入序號輸入頁
+        #   前提) 已登入認證會員帳號（純點帳 hfivenew-202601test000101，已進階認證）
+        #   1. 開啟儲值彈窗，切換至 iframe
+        #   2. 驗證左側側欄顯示「認證會員」
+        # Expected Result: Remain_point1_lblVerifiedMember 文字包含「認證會員」
+        # 【異動說明】序號儲值導覽項目已由 JS 隱藏（IsWhiteList=true 才顯示），
+        #   改為驗證彈窗側欄正確顯示帳號認證狀態
 
         with allure.step("1. 開啟彈窗並切換至 iframe"):
             self.home.open_topup_popup()
@@ -573,13 +569,9 @@ class TestPCTopupSerialUnlocked:
             self.topup.dismiss_anti_fraud_if_present()
             _screenshot(self.driver, "步驟1_切換iframe")
 
-        with allure.step("2. 點擊序號儲值導覽"):
-            self.topup.click_nav_serial_topup(_TIMEOUT)
-            _screenshot(self.driver, "步驟2_點擊序號儲值")
-
-        with allure.step("3. 驗證已解鎖（前往認證連結不存在）"):
-            self.topup.assert_serial_topup_unlocked(_TIMEOUT)
-            _screenshot(self.driver, "步驟3_序號儲值已解鎖")
+        with allure.step("2. 驗證側欄顯示認證會員"):
+            self.topup.assert_verified_member(_TIMEOUT)
+            _screenshot(self.driver, "步驟2_認證會員確認")
             self.driver.switch_to.default_content()
 
 
@@ -658,25 +650,43 @@ class TestPCTopupGPAccount:
         self.login = LoginPage(self.driver)
         self.topup = TopupPopupPage(self.driver)
         try:
-            account, password = get_gp_credentials()
+            candidates = get_gp_credentials()
         except ValueError as e:
             pytest.skip(str(e))
         otp = get_beanfun_otp()
-        try:
-            self.home.go_to_home()
-            self.home.click_login_btn()
-            self.login.login_action(account, password, wait_for_verify=False)
-            self.login.click_element_safely(self.login.GO_TO_VERIFY_BTN)
-            self.login.fill_otp_code(otp)
-            self.login.click_final_confirm()
-            self.login.select_first_account_and_confirm()
-            WebDriverWait(self.driver, 20).until(EC.url_contains("beanfun.com"))
-            self.home.handle_alert()
-            self.home.dismiss_blocking_overlays()
-            self.home.go_to_home()
-        except Exception as e:
-            import pytest as _pytest
-            _pytest.skip(f"被鎖定：GP點帳登入失敗，請稍後重試 - {e}")
+        last_error = None
+        for account, password in candidates:
+            try:
+                # 重試前關閉多餘視窗，確保只剩主視窗
+                while len(self.driver.window_handles) > 1:
+                    self.driver.switch_to.window(self.driver.window_handles[-1])
+                    self.driver.close()
+                self.driver.switch_to.window(self.driver.window_handles[0])
+                self.home.go_to_home()
+                self.home.click_login_btn()
+                self.login.login_action(account, password, wait_for_verify=False)
+                self.login.click_element_safely(self.login.GO_TO_VERIFY_BTN)
+                self.login.fill_otp_code(otp)
+                self.login.click_final_confirm()
+                try:
+                    self.login.select_first_account_and_confirm()
+                except AssertionError:
+                    pass  # 部分帳號不需要選帳號步驟
+                # GamaPass 視窗關閉後切回 beanfun.com 視窗
+                WebDriverWait(self.driver, 10).until(
+                    lambda d: len(d.window_handles) == 1
+                )
+                self.driver.switch_to.window(self.driver.window_handles[0])
+                WebDriverWait(self.driver, 20).until(EC.url_contains("beanfun.com"))
+                self.home.handle_alert()
+                self.home.dismiss_blocking_overlays()
+                self.home.go_to_home()
+                last_error = None
+                break
+            except Exception as e:
+                last_error = e
+        if last_error:
+            pytest.skip(f"GP點帳全部登入失敗（主帳＋備援）：{last_error}")
         yield
         try:
             self.driver.switch_to.default_content()
@@ -733,7 +743,7 @@ class TestPCTopupGPAccount:
 
         with allure.step("2. 點擊快速啟動，開啟遊戲選擇彈窗"):
             self.home.click_quick_start()
-            self.home.wait_until_visible(HomePage.QUICK_START_POPUP)
+            self.home.wait_until_visible(HomePage.QUICK_START_GAME_LI)
             _screenshot(self.driver, "步驟2_彈窗出現")
 
         with allure.step("3. 點擊遊戲，觸發啟動遊戲"):

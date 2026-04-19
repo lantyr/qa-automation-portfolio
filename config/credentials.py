@@ -27,12 +27,17 @@ def get_pure_credentials():
     return account, password
 
 def get_gp_credentials():
-    """GP點帳（有綁定 GamaPass，有雲端背包）"""
+    """GP點帳（有綁定 GamaPass，有雲端背包）。回傳 list，含備援帳號。"""
     account = os.getenv("BEANFUN_GP_ACCOUNT")
     password = os.getenv("BEANFUN_GP_PASSWORD")
     if not account or not password:
         raise ValueError("缺少 GP 帳密，請設定 BEANFUN_GP_ACCOUNT / BEANFUN_GP_PASSWORD")
-    return account, password
+    backup_account = os.getenv("BEANFUN_GP_BACKUP_ACCOUNT")
+    backup_password = os.getenv("BEANFUN_GP_BACKUP_PASSWORD")
+    candidates = [(account, password)]
+    if backup_account and backup_password:
+        candidates.append((backup_account, backup_password))
+    return candidates
 
 def get_star_credentials():
     """星帳（有雲端背包）"""

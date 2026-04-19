@@ -4,3 +4,4 @@ allure-pytest>=2.15
 python-dotenv>=1.0
 allure-combine>=1.0.11
 pytest-rerunfailures>=14.0
+requests>=2.32

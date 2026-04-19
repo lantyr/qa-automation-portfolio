@@ -429,13 +429,12 @@ class TestPCActionBarLoggedIn:
             self.home.click_element_safely(HomePage.LOGOUT_BTN)
             _screenshot(self.driver, "步驟2_點擊登出")
 
-        with allure.step("3. 接受登出確認彈窗"):
-            from selenium.common.exceptions import NoAlertPresentException
-            try:
-                WebDriverWait(self.driver, _TIMEOUT).until(EC.alert_is_present())
-                self.driver.switch_to.alert.accept()
-            except (TimeoutException, NoAlertPresentException):
-                pass
+        with allure.step("3. 接受登出確認彈窗（切換至 iframe#fbContent 後點擊 OkButton）"):
+            # 登出確認彈窗在 iframe#fbContent 內，需先切換 context 再點擊
+            iframe = self.home.wait_until_visible(HomePage.LOGOUT_CONFIRM_IFRAME)
+            self.driver.switch_to.frame(iframe)
+            self.home.click_element_safely(HomePage.LOGOUT_CONFIRM_OK)
+            self.driver.switch_to.default_content()
             _screenshot(self.driver, "步驟3_確認登出")
 
         with allure.step("4. 驗證導覽列回到未登入狀態"):
