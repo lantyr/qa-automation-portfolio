@@ -157,18 +157,18 @@ class HomePage(BasePage):
     def is_hero_banner_visible(self):
         self._switch_to_banner_iframe()
         # 統一使用 BasePage 封裝的布林判斷方法
-        is_visible = self.is_displayed(self.BANNER_CONTAINER)
+        is_visible = self.is_element_displayed(self.BANNER_CONTAINER)
         self.driver.switch_to.default_content()
         return is_visible
 
     def switch_hero_banner_next(self):
         self._switch_to_banner_iframe()
-        self.click_element(self.BANNER_NEXT_BTN)
+        self.click_element_safely(self.BANNER_NEXT_BTN)
         self.driver.switch_to.default_content()
 
     def click_hero_banner(self):
         self._switch_to_banner_iframe()
-        self.click_element(self.ACTIVE_BANNER_LINK)
+        self.click_element_safely(self.ACTIVE_BANNER_LINK)
         self.driver.switch_to.default_content()
 
     def get_current_banner_href(self):
@@ -179,7 +179,7 @@ class HomePage(BasePage):
 
     # --- News Actions ---
     def verify_news_ready(self):
-        return self.is_displayed(self.NEWS_CONTAINER)
+        return self.is_element_displayed(self.NEWS_CONTAINER)
 
     def get_first_news_title(self):
         return self.get_text(self.NEWS_FIRST_ITEM_TXT)
@@ -190,17 +190,17 @@ class HomePage(BasePage):
         return len(elements) > 0
 
     def click_first_news(self):
-        self.click_element(self.NEWS_FIRST_ITEM_LINK)
+        self.click_element_safely(self.NEWS_FIRST_ITEM_LINK)
 
     # --- Chatbot Actions ---
     def verify_chatbot_ready(self):
-        return self.is_displayed(self.CHATBOT_BTN)
+        return self.is_element_displayed(self.CHATBOT_BTN)
 
     def click_chatbot(self):
         self.click_element_safely(self.CHATBOT_BTN)
 
     def verify_chatbot_opened(self):
-        return self.is_displayed(self.CHATBOT_WINDOW_TITLE)
+        return self.is_element_displayed(self.CHATBOT_WINDOW_TITLE)
 
     # --- 登入 / 彈窗處理 Actions ---
     def click_login_btn(self):

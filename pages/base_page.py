@@ -109,6 +109,15 @@ class BasePage:
         except TimeoutException:
             return []
 
+    def take_screenshot(self, name: str) -> None:
+        """附加截圖至 Allure 報告。"""
+        import allure
+        allure.attach(
+            self.driver.get_screenshot_as_png(),
+            name=name,
+            attachment_type=allure.attachment_type.PNG,
+        )
+
     def check_for_rate_limit(self):
         """偵測網站是否回傳 429 Too Many Requests。
 

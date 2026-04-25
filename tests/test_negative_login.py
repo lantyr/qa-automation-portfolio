@@ -55,7 +55,7 @@ class TestNegativeLogin:
         login_page = LoginPage(driver)
         self.common_setup(driver)
         with allure.step("1. 驗證輸入少一碼的手機號碼並點擊登入"):
-            login_page.find(login_page.STEP1_ACCOUNT).send_keys("098348194")
+            login_page.wait_until_visible(login_page.STEP1_ACCOUNT).send_keys("098348194")
             login_page.take_screenshot("帳號少一碼輸入狀態") # 📸 動作截圖
             btn = login_page.wait.until(EC.presence_of_element_located(login_page.STEP1_BTN))
             login_page.driver.execute_script("arguments[0].click();", btn)
