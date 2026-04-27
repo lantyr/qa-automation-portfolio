@@ -1,0 +1,14 @@
+services:
+  tests:
+    build: .
+    container_name: beanfun-tests
+    # 把 .env 檔案傳入容器（帳號密碼不打包進 image）
+    env_file:
+      - .env
+    # 額外確保 headless 模式開啟
+    environment:
+      - PYTEST_HEADLESS=1
+    # 把測試結果資料夾掛載回本機，跑完就能看到 allure-results
+    volumes:
+      - ./allure-results:/app/allure-results
+      - ./allure-report:/app/allure-report

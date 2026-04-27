@@ -1,0 +1,14 @@
+{
+  "element_timeout": 10,
+  "initial_state": {
+    "expected_title_fragment": "遊戲橘子",
+    "expected_url_fragment": "tw.beanfun.com"
+  },
+  "invalid_format": {
+    "short_phone": "098348194"
+  },
+  "wrong_password": {
+    "account": "0983481944",
+    "password": "WrongPassword123"
+  }
+}

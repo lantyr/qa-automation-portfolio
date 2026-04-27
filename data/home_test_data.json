@@ -1,0 +1,11 @@
+{
+  "tabs": [
+    {"id": "hot_online", "name": "熱門線上", "expected_keyword": "Online_Game"},
+    {"id": "popular_mobile", "name": "人氣手遊", "expected_keyword": "Mobile_Game"},
+    {"id": "direct_service", "name": "原廠直營", "expected_keyword": "Direct_Service"}
+  ],
+  "video": {
+    "iframe_selector": "#youtube_player_iframe",
+    "play_button_aria": "播放"
+  }
+}
