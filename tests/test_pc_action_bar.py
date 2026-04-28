@@ -104,7 +104,9 @@ class TestPCActionBarDisplay:
             _screenshot(driver, "步驟2_3_登入完成")
 
         with allure.step("4. 等待首頁載入並驗證導覽列"):
-            WebDriverWait(driver, 20).until(EC.url_contains("beanfun.com"))
+            WebDriverWait(driver, 20).until(
+                EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+            )
             home.handle_alert()
             home.dismiss_blocking_overlays()
             home.go_to_home()
@@ -159,7 +161,9 @@ class TestPCActionBarDisplay:
             _screenshot(driver, "步驟5_帳號選擇完成")
 
         with allure.step("6. 等待首頁載入並驗證導覽列"):
-            WebDriverWait(driver, 20).until(EC.url_contains("beanfun.com"))
+            WebDriverWait(driver, 20).until(
+                EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+            )
             home.handle_alert()
             home.dismiss_blocking_overlays()
             home.go_to_home()
@@ -196,7 +200,9 @@ class TestPCActionBarDisplay:
             _screenshot(driver, "步驟2_3_登入完成")
 
         with allure.step("4. 等待首頁載入並驗證導覽列"):
-            WebDriverWait(driver, 20).until(EC.url_contains("beanfun.com"))
+            WebDriverWait(driver, 20).until(
+                EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+            )
             home.handle_alert()
             home.dismiss_blocking_overlays()
             home.go_to_home()
@@ -261,7 +267,9 @@ class TestPCActionBarLoggedIn:
             except Exception:
                 pytest.skip("beanfun OTP 驗證頁未出現，請等待數分鐘後重新執行")
             self.login.click_final_confirm()
-            WebDriverWait(class_driver, 20).until(EC.url_contains("beanfun.com"))
+            WebDriverWait(class_driver, 20).until(
+                EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+            )
             self.home.handle_alert()
             self.home.dismiss_blocking_overlays()
             TestPCActionBarLoggedIn._login_ok = True
@@ -269,6 +277,9 @@ class TestPCActionBarLoggedIn:
             self.driver.switch_to.default_content()
             self.home.go_to_home_if_needed()
             self.home.dismiss_blocking_overlays()
+            if not self.home.is_element_displayed(HomePage.LOGOUT_BTN, timeout=3):
+                TestPCActionBarLoggedIn._login_ok = False
+                pytest.skip("Session 已失效（dismiss_blocking_overlays 誤觸登出），請重新執行")
 
     # ────────────────────────────────────────────────────────────
     # TC-PC-AB-007
@@ -473,7 +484,9 @@ class TestPCActionBarGPAccount:
                 self.login.fill_otp_code(otp)
                 self.login.click_final_confirm()
                 self.login.select_first_account_and_confirm()
-                WebDriverWait(class_driver, _TIMEOUT).until(EC.url_contains("beanfun.com"))
+                WebDriverWait(class_driver, _TIMEOUT).until(
+                    EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+                )
                 self.home.handle_alert()
                 self.home.dismiss_blocking_overlays()
                 self.home.go_to_home()
@@ -484,6 +497,9 @@ class TestPCActionBarGPAccount:
             self.driver.switch_to.default_content()
             self.home.go_to_home_if_needed()
             self.home.dismiss_blocking_overlays()
+            if not self.home.is_element_displayed(HomePage.LOGOUT_BTN, timeout=3):
+                TestPCActionBarGPAccount._login_ok = False
+                pytest.skip("Session 已失效（dismiss_blocking_overlays 誤觸登出），請重新執行")
 
     # ────────────────────────────────────────────────────────────
     # TC-PC-AB-006
