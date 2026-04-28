@@ -54,7 +54,9 @@ class TestPasswordLogin:
 
         with allure.step("2. 以純點帳執行帳密登入"):
             login.login_action_pure(account, password)
-            WebDriverWait(driver, _TIMEOUT).until(EC.url_contains("beanfun.com"))
+            WebDriverWait(driver, _TIMEOUT).until(
+                EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+            )
             home.handle_alert()
             home.dismiss_blocking_overlays()
             _screenshot(driver, "步驟2_登入流程完成")

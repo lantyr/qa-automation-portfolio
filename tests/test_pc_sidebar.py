@@ -59,7 +59,9 @@ class TestPCMemberCenterPureSidebar:
             account, password = get_pure_credentials()
             self.home.click_login_btn()
             self.login.login_action_pure(account, password)
-            WebDriverWait(class_driver, _TIMEOUT).until(EC.url_contains("beanfun.com"))
+            WebDriverWait(class_driver, _TIMEOUT).until(
+                EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+            )
             self.home.handle_alert()
             self.home.dismiss_blocking_overlays()
             self.home.go_to_home()
@@ -577,7 +579,9 @@ class TestPCMemberCenterStarSidebar:
                 self.login.select_first_account_and_confirm()
             except AssertionError:
                 pass
-            WebDriverWait(class_driver, _TIMEOUT).until(EC.url_contains("beanfun.com"))
+            WebDriverWait(class_driver, _TIMEOUT).until(
+                EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+            )
             self.home.handle_alert()
             self.home.dismiss_blocking_overlays()
             self.home.go_to_home()

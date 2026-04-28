@@ -45,7 +45,9 @@ def _login_gp(home, login):
         login.select_first_account_and_confirm()
     except AssertionError:
         pass
-    WebDriverWait(home.driver, _TIMEOUT).until(EC.url_contains("beanfun.com"))
+    WebDriverWait(home.driver, _TIMEOUT).until(
+        EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+    )
     home.handle_alert()
     home.dismiss_blocking_overlays()
 
@@ -67,7 +69,9 @@ def _login_star(home, login):
         login.select_first_account_and_confirm()
     except AssertionError:
         pass
-    WebDriverWait(home.driver, _TIMEOUT).until(EC.url_contains("beanfun.com"))
+    WebDriverWait(home.driver, _TIMEOUT).until(
+        EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+    )
     home.handle_alert()
     home.dismiss_blocking_overlays()
 
