@@ -455,6 +455,9 @@ def _build_accordion_html(
             for test in tests:
                 st     = test.get("status", "")
                 t_name = _format_test_name(test.get("name", "").strip())
+                params = {p["name"]: p["value"] for p in test.get("parameters", [])}
+                if "帳號" in params:
+                    t_name += f' <span style="font-weight:normal;font-size:11px;color:#666;">({params["帳號"]})</span>'
                 msg    = test.get("statusDetails", {}).get("message", "")
 
                 if st == "passed":
