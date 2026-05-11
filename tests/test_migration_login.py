@@ -59,6 +59,7 @@ class TestGamaPassLogin:
         home = HomePage(driver)
         login = LoginPage(driver)
         account, password = get_gp_credentials()[0]
+        allure.dynamic.parameter("帳號", account)
         otp = get_beanfun_otp()
 
         with allure.step("1. 前往首頁並點擊登入"):
@@ -88,7 +89,9 @@ class TestGamaPassLogin:
 
         with allure.step("5. 驗證登入成功"):
             _switch_to_main_window(driver)
-            WebDriverWait(driver, _TIMEOUT).until(EC.url_contains("beanfun.com"))
+            WebDriverWait(driver, _TIMEOUT).until(
+                EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+            )
             home.handle_alert()
             home.dismiss_blocking_overlays()
             home.go_to_home()
@@ -115,6 +118,7 @@ class TestGamaPassLogin:
         home = HomePage(driver)
         login = LoginPage(driver)
         account, password = get_star_credentials()
+        allure.dynamic.parameter("帳號", account)
         otp = get_beanfun_otp()
 
         with allure.step("1. 前往首頁並點擊登入"):
@@ -144,7 +148,9 @@ class TestGamaPassLogin:
 
         with allure.step("5. 驗證登入成功"):
             _switch_to_main_window(driver)
-            WebDriverWait(driver, _TIMEOUT).until(EC.url_contains("beanfun.com"))
+            WebDriverWait(driver, _TIMEOUT).until(
+                EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+            )
             home.handle_alert()
             home.dismiss_blocking_overlays()
             home.go_to_home()

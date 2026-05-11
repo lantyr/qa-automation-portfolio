@@ -4,13 +4,21 @@ import sys
 import json
 import glob
 import re
+import base64
+import io
+import uuid
 import socket
 import platform
 import subprocess
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
+from email.mime.base import MIMEBase
 from email.header import Header
+from email import encoders
+import zipfile
+from PIL import Image
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -23,9 +31,6 @@ for _stream in (sys.stdout, sys.stderr):
             pass
 
 _EXTRA_REPORT_RECEIVERS = ()
-
-_DIV  = "━" * 26   # ━━━━━━━━━━━━━━━━━━━━━━━━━━
-_DIV2 = "━" * 30   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 # 功能 → 大分類 對應表
 _FEATURE_CATEGORY = {
@@ -88,7 +93,6 @@ def _mask_email(addr: str) -> str:
 
 
 def _get_chrome_version() -> str:
-    """嘗試從 Windows 登錄檔取得 Chrome 版本號。"""
     keys = [
         r"HKEY_CURRENT_USER\Software\Google\Chrome\BLBeacon",
         r"HKEY_LOCAL_MACHINE\SOFTWARE\Google\Chrome\BLBeacon",
@@ -109,7 +113,6 @@ def _get_chrome_version() -> str:
 
 
 def _get_timing(results_dir: str) -> tuple[int | None, int | None]:
-    """從 allure-results JSON 取得最早 start 與最晚 stop（毫秒時間戳）。"""
     min_start: int | None = None
     max_stop:  int | None = None
     for jf in glob.glob(os.path.join(results_dir, "*-result.json")):
@@ -127,11 +130,6 @@ def _get_timing(results_dir: str) -> tuple[int | None, int | None]:
 
 
 def _pick_local_report_html(base_dir: str) -> tuple[str, bool]:
-    """
-    優先取 HistoryReports 內最新的日期快照（Report_YYYYMMDD_HHMMSS.html）。
-    這樣每封信的路徑都指向當次執行的固定檔案，事後點開不會看到其他日期的資料。
-    若 HistoryReports 尚無檔案，則退而使用 allure-report/complete.html 或 index.html。
-    """
     history_dir = os.path.join(base_dir, "HistoryReports")
     if os.path.isdir(history_dir):
         snapshots = sorted(
@@ -152,12 +150,6 @@ def _pick_local_report_html(base_dir: str) -> tuple[str, bool]:
 
 
 def _load_features(results_dir: str) -> tuple[dict, dict, float]:
-    """
-    讀取 allure-results，回傳：
-      features      = { feature_name: [test_data, ...] }
-      summary_data  = { total, passed, failed, locked }
-      success_rate  = float
-    """
     summary_data: dict = {"total": 0, "passed": 0, "failed": 0, "locked": 0}
     json_files = glob.glob(os.path.join(results_dir, "*-result.json"))
     if not json_files:
@@ -204,66 +196,356 @@ def _load_features(results_dir: str) -> tuple[dict, dict, float]:
 
 
 def _format_test_name(raw: str) -> str:
-    """'TC-XX-XXX：描述' → 'TC-XX-XXX: 描述'"""
     return raw.replace("：", ": ")
 
 
-def _format_detailed_section(features: dict) -> str:
-    """依大分類 → 功能 → 測試案例 → 步驟 格式化詳細結果。"""
-    ordered = [f for f in _FEATURE_ORDER if f in features] + \
-              [f for f in features if f not in _FEATURE_ORDER]
+def _compress_image_bytes(path: str, max_width: int = 950, quality: int = 95) -> bytes | None:
+    """PNG → 高品質 JPEG（q=85, 800px），三欄放大後仍清晰，用於 CID email 嵌入。"""
+    try:
+        with Image.open(path) as img:
+            img = img.convert("RGB")
+            w, h = img.size
+            if w > max_width:
+                img = img.resize((max_width, int(h * max_width / w)), Image.LANCZOS)
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=quality, optimize=True)
+            return buf.getvalue()
+    except Exception:
+        return None
 
-    # 先依大分類分組
+
+def _collect_screenshots_cid(
+    steps: list,
+    results_dir: str,
+    cid_images: list,
+) -> list[str]:
+    """遞迴收集 steps 所有截圖，壓縮後以 CID 儲存。
+    cid_images 為共用累積清單 [(cid, bytes)]，回傳本層的 cid 清單。
+    """
+    cids: list[str] = []
+    for step in steps:
+        for att in step.get("attachments", []):
+            if att.get("type") == "image/png":
+                data = _compress_image_bytes(os.path.join(results_dir, att["source"]))
+                if data:
+                    cid = uuid.uuid4().hex
+                    cid_images.append((cid, data))
+                    cids.append(cid)
+        sub = step.get("steps", [])
+        if sub:
+            cids.extend(_collect_screenshots_cid(sub, results_dir, cid_images))
+    return cids
+
+
+def _screenshots_grid_html(cids: list[str]) -> str:
+    """將 CID 清單渲染成兩欄縮圖格（可展開的 details）。"""
+    if not cids:
+        return ""
+    rows = []
+    for i in range(0, len(cids), 2):
+        row = cids[i:i + 2]
+        cells = "".join(
+            f'<td style="padding:3px;vertical-align:top;width:50%;">'
+            f'<img src="cid:{cid}" style="width:100%;border:1px solid #bbb;'
+            f'border-radius:3px;display:block;"></td>'
+            for cid in row
+        )
+        cells += '<td style="padding:3px;width:50%;"></td>' * (2 - len(row))
+        rows.append(f"<tr>{cells}</tr>")
+    rows_html = "\n".join(rows)
+    return (
+        f'<details style="margin:6px 10px;">'
+        f'<summary style="cursor:pointer;font-size:12px;color:#1565c0;'
+        f'background:#e3f2fd;padding:2px 8px;border-radius:3px;display:inline-block;">'
+        f'📸 截圖（{len(cids)} 張）</summary>'
+        f'<div style="margin-top:6px;">'
+        f'<table style="width:100%;border-collapse:collapse;">{rows_html}</table>'
+        f'</div></details>\n'
+    )
+
+
+def _steps_html(steps: list, level: int = 0) -> str:
+    """遞迴將 Allure steps 轉成 HTML 文字列表（截圖由外層統一收集顯示）。"""
+    _STATUS_STYLE = {
+        "passed":  ("✅", "#e8f5e9", "#2e7d32"),
+        "failed":  ("❌", "#ffebee", "#c62828"),
+        "broken":  ("💥", "#ffebee", "#c62828"),
+        "skipped": ("⚠️", "#fffde7", "#f57f17"),
+    }
+    pad = 16 + level * 20
+    html = ""
+    for i, step in enumerate(steps, 1):
+        st = step.get("status", "unknown")
+        icon, bg, fg = _STATUS_STYLE.get(st, ("•", "#f5f5f5", "#777"))
+
+        name = step.get("name", "").strip()
+        name = re.sub(r"^步驟\s*\d+\s*:\s*", "", name)
+        name = re.sub(r"^\d+\.\s*", "", name)
+
+        html += (
+            f'<div style="padding:4px 8px 4px {pad}px;background:{bg};'
+            f'color:{fg};font-size:13px;border-bottom:1px solid rgba(0,0,0,0.05);">'
+            f'{icon} {i}. {name}</div>\n'
+        )
+        sub = step.get("steps", [])
+        if sub:
+            html += _steps_html(sub, level + 1)
+    return html
+
+
+def _feat_pass_count(tests: list) -> tuple[int, int]:
+    passed = sum(1 for t in tests if t.get("status") == "passed")
+    return passed, len(tests)
+
+
+def _build_accordion_html(
+    features: dict,
+    summary: dict,
+    success_rate: float,
+    start_str: str,
+    end_str: str,
+    elapsed: float,
+    chrome_ver: str,
+    hostname: str,
+    ip: str,
+    os_name: str,
+    status_text: str,
+    results_dir: str,
+    report_path: str,
+    report_file_ok: bool,
+) -> tuple[str, list[tuple[str, bytes]]]:
+    """HTML 手風琴報告 + CID 截圖清單。回傳 (html, [(cid, bytes)])。"""
+    cid_images: list[tuple[str, bytes]] = []
+
+    rate_color = (
+        "#2e7d32" if success_rate >= 90
+        else ("#f57f17" if success_rate >= 70 else "#c62828")
+    )
+
+    html = f"""<!DOCTYPE html>
+<html lang="zh-TW"><head><meta charset="utf-8">
+<style>
+  details > summary {{ list-style: none; }}
+  details > summary::-webkit-details-marker {{ display: none; }}
+  details[open] > summary .arr {{ transform: rotate(90deg); }}
+  .arr {{ display:inline-block; transition:transform .2s; }}
+</style>
+</head>
+<body style="font-family:Arial,'Microsoft JhengHei',sans-serif;font-size:14px;
+             color:#333;max-width:960px;margin:0 auto;padding:20px;">
+
+<h2 style="color:#1565c0;border-bottom:3px solid #1565c0;padding-bottom:10px;margin-bottom:16px;">
+  📋 官網自動化測試報告
+</h2>
+
+<!-- 環境資訊 -->
+<table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px;
+              border:1px solid #e0e0e0;border-radius:4px;">
+  <tr style="background:#1565c0;color:white;">
+    <th colspan="2" style="padding:8px 12px;text-align:left;">🖥️ 測試環境資訊</th>
+  </tr>
+  <tr>
+    <td style="padding:5px 12px;color:#555;width:140px;border-bottom:1px solid #f0f0f0;">執行時間</td>
+    <td style="padding:5px 12px;border-bottom:1px solid #f0f0f0;">{start_str} ～ {end_str}</td>
+  </tr>
+  <tr style="background:#f9f9f9;">
+    <td style="padding:5px 12px;color:#555;border-bottom:1px solid #f0f0f0;">耗時</td>
+    <td style="padding:5px 12px;border-bottom:1px solid #f0f0f0;">{elapsed:.1f} 秒</td>
+  </tr>
+  <tr>
+    <td style="padding:5px 12px;color:#555;border-bottom:1px solid #f0f0f0;">測試裝置</td>
+    <td style="padding:5px 12px;border-bottom:1px solid #f0f0f0;">{os_name} + Chrome (Headless) {chrome_ver}</td>
+  </tr>
+  <tr style="background:#f9f9f9;">
+    <td style="padding:5px 12px;color:#555;border-bottom:1px solid #f0f0f0;">網路環境</td>
+    <td style="padding:5px 12px;border-bottom:1px solid #f0f0f0;">{hostname} / {ip}</td>
+  </tr>
+  <tr>
+    <td style="padding:5px 12px;color:#555;">測試框架</td>
+    <td style="padding:5px 12px;">pytest + Selenium WebDriver</td>
+  </tr>
+</table>
+
+<!-- 統計摘要 -->
+<table style="width:100%;border-collapse:collapse;margin-bottom:20px;
+              border:1px solid #e0e0e0;font-size:14px;">
+  <tr style="background:#1565c0;color:white;">
+    <th colspan="4" style="padding:8px 12px;text-align:left;">📊 測試統計摘要</th>
+  </tr>
+  <tr style="text-align:center;background:#f9f9f9;">
+    <td style="padding:10px;border:1px solid #e0e0e0;">
+      <div style="font-size:22px;font-weight:bold;">{summary['total']}</div>
+      <div style="font-size:11px;color:#777;">總測試數</div>
+    </td>
+    <td style="padding:10px;border:1px solid #e0e0e0;color:#2e7d32;">
+      <div style="font-size:22px;font-weight:bold;">✅ {summary['passed']}</div>
+      <div style="font-size:11px;color:#777;">通過</div>
+    </td>
+    <td style="padding:10px;border:1px solid #e0e0e0;color:#c62828;">
+      <div style="font-size:22px;font-weight:bold;">❌ {summary['failed']}</div>
+      <div style="font-size:11px;color:#777;">失敗</div>
+    </td>
+    <td style="padding:10px;border:1px solid #e0e0e0;color:#f57f17;">
+      <div style="font-size:22px;font-weight:bold;">⚠️ {summary['locked']}</div>
+      <div style="font-size:11px;color:#777;">跳過/鎖定</div>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="4" style="text-align:center;padding:12px;font-size:18px;font-weight:bold;
+                            color:{rate_color};border:1px solid #e0e0e0;">
+      成功率：{success_rate:.1f}%　{status_text}
+    </td>
+  </tr>
+</table>
+
+<h3 style="color:#1565c0;border-bottom:1px solid #bbdefb;padding-bottom:6px;">📝 詳細測試結果</h3>
+"""
+
+    ordered_feats = [f for f in _FEATURE_ORDER if f in features] + \
+                    [f for f in features if f not in _FEATURE_ORDER]
+
     categories: dict[str, list[str]] = {}
-    for feat in ordered:
+    for feat in ordered_feats:
         cat = _FEATURE_CATEGORY.get(feat, "📋 其他測試")
         categories.setdefault(cat, []).append(feat)
 
     cat_order = _CATEGORY_ORDER + [c for c in categories if c not in _CATEGORY_ORDER]
 
-    lines = ""
     for cat in cat_order:
         if cat not in categories:
             continue
-        lines += f"{_DIV2}\n{cat}\n{_DIV2}\n\n"
 
-        for feat in categories[cat]:
-            lines += f"【{feat}】\n"
+        cat_feats = categories[cat]
+        cat_total = sum(len(features[f]) for f in cat_feats)
+        cat_pass  = sum(
+            sum(1 for t in features[f] if t.get("status") == "passed")
+            for f in cat_feats
+        )
+        cat_has_fail = any(
+            any(t.get("status") not in ("passed", "skipped") for t in features[f])
+            for f in cat_feats
+        )
+        cat_hdr_bg = "#c62828" if cat_has_fail else "#2e7d32"
+
+        html += f"""
+<details open style="margin-bottom:10px;border:1px solid #ddd;border-radius:5px;overflow:hidden;">
+  <summary style="padding:10px 14px;background:{cat_hdr_bg};color:white;
+                  cursor:pointer;font-weight:bold;font-size:15px;">
+    <span class="arr">▶</span> {cat} &nbsp; [{cat_pass}/{cat_total}]
+  </summary>
+  <div style="padding:10px;">
+"""
+
+        for feat in cat_feats:
             tests = sorted(features[feat], key=lambda t: t.get("name", ""))
+            f_pass, f_total = _feat_pass_count(tests)
+            f_has_fail = any(t.get("status") not in ("passed", "skipped") for t in tests)
+            f_bg = "#fff3e0" if f_has_fail else "#f1f8e9"
+            f_border = "#e65100" if f_has_fail else "#558b2f"
+
+            html += f"""
+    <details style="margin-bottom:8px;border:1px solid {f_border};border-radius:4px;overflow:hidden;">
+      <summary style="padding:7px 12px;background:{f_bg};cursor:pointer;
+                      font-weight:bold;font-size:14px;border-left:4px solid {f_border};">
+        <span class="arr">▶</span> 【{feat}】&nbsp; [{f_pass}/{f_total}]
+      </summary>
+      <div style="padding:6px 0;">
+"""
 
             for test in tests:
-                status       = test.get("status", "")
-                skip_message = test.get("statusDetails", {}).get("message", "")
-                raw_name     = test.get("name", "").strip()
-                test_name    = _format_test_name(raw_name)
+                st     = test.get("status", "")
+                t_name = _format_test_name(test.get("name", "").strip())
+                msg    = test.get("statusDetails", {}).get("message", "")
 
-                if status == "passed":
-                    lines += f"  {test_name} [PASS]\n"
-                    for s_idx, step in enumerate(test.get("steps", []), 1):
-                        sname = step.get("name", "").strip()
-                        sname = re.sub(r"^步驟\s*\d+\s*:\s*", "", sname)
-                        sname = re.sub(r"^\d+\.\s*", "", sname)
-                        lines += f"    步驟 {s_idx}: {sname} [PASS]\n"
-                    lines += "\n"
-
-                elif status == "skipped":
-                    reason = skip_message.strip().split("\n")[0] if skip_message else "環境限制"
-                    lines += f"  🔒 {test_name} [SKIP]\n"
-                    lines += f"    原因：{reason}\n\n"
-
+                if st == "passed":
+                    t_bg, t_fg, t_icon, t_open = "#e8f5e9", "#2e7d32", "✅", ""
+                elif st == "skipped":
+                    t_bg, t_fg, t_icon, t_open = "#fffde7", "#f57f17", "⚠️", ""
                 else:
-                    lines += f"  {test_name} [FAIL]\n"
-                    for s_idx, step in enumerate(test.get("steps", []), 1):
-                        s_status = "PASS" if step["status"] == "passed" else "FAIL"
-                        sname = step.get("name", "").strip()
-                        sname = re.sub(r"^步驟\s*\d+\s*:\s*", "", sname)
-                        sname = re.sub(r"^\d+\.\s*", "", sname)
-                        lines += f"    步驟 {s_idx}: {sname} [{s_status}]\n"
-                    lines += "\n"
+                    t_bg, t_fg, t_icon, t_open = "#ffebee", "#c62828", "❌", " open"
 
-            lines += "\n"
+                html += f"""
+        <details{t_open} style="margin:5px 10px;border:1px solid #e0e0e0;border-radius:3px;overflow:hidden;">
+          <summary style="padding:6px 10px;background:{t_bg};color:{t_fg};
+                          cursor:pointer;font-size:13px;font-weight:bold;">
+            <span class="arr">▶</span> {t_icon} {t_name}
+          </summary>
+          <div style="background:#fff;">
+"""
 
-    return lines.rstrip()
+                if st == "skipped":
+                    reason = msg.strip().split("\n")[0] if msg else "環境限制"
+                    html += (
+                        f'<div style="padding:6px 20px;color:#f57f17;font-size:12px;">'
+                        f'原因：{reason}</div>\n'
+                    )
+                else:
+                    steps = test.get("steps", [])
+                    if steps:
+                        html += _steps_html(steps)
+                        cids = _collect_screenshots_cid(steps, results_dir, cid_images)
+                        if cids:
+                            html += _screenshots_grid_html(cids)
+                    elif st != "passed" and msg:
+                        escaped = msg.strip()[:400].replace("<", "&lt;").replace(">", "&gt;")
+                        html += (
+                            f'<div style="padding:6px 20px;color:#c62828;'
+                            f'font-size:12px;font-family:monospace;">{escaped}</div>\n'
+                        )
+
+                html += "          </div>\n        </details>\n"
+
+            html += "      </div>\n    </details>\n"
+
+        html += "  </div>\n</details>\n"
+
+    report_note = (
+        f'📁 <code style="font-size:12px;color:#1565c0;">{report_path}</code>'
+        if report_file_ok
+        else f'⚠️ 找不到報告檔，預期路徑：<code style="font-size:12px;">{report_path}</code>'
+    )
+
+    html += f"""
+<p style="margin-top:24px;color:#999;font-size:12px;
+          border-top:1px solid #eee;padding-top:12px;line-height:1.8;">
+  {report_note}<br>
+  自動化機器人 敬上
+</p>
+
+</body></html>"""
+
+    return html, cid_images
+
+
+def _collect_allure_attachments(base_dir: str) -> tuple[str | None, str | None, int]:
+    """Find current Allure HTML (most recent Allure_*.html) and ZIP historical ones from past 7 days.
+    Returns (current_path, zip_path, historical_count)."""
+    history_dir = os.path.join(base_dir, "HistoryReports")
+    if not os.path.isdir(history_dir):
+        return None, None, 0
+
+    allure_files = sorted(
+        glob.glob(os.path.join(history_dir, "Allure_*.html")),
+        reverse=True,
+    )
+    if not allure_files:
+        return None, None, 0
+
+    current = allure_files[0]
+    cutoff = datetime.now().timestamp() - 7 * 86400
+    historical = [
+        f for f in allure_files[1:]
+        if os.path.getmtime(f) >= cutoff
+    ]
+
+    zip_path = None
+    if historical:
+        zip_path = os.path.join(base_dir, "_allure_history_week.zip")
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for f in historical:
+                zf.write(f, os.path.basename(f))
+
+    return current, zip_path, len(historical)
 
 
 def send_email() -> None:
@@ -310,57 +592,76 @@ def send_email() -> None:
         else ("❌ 有失敗項目" if summary["failed"] > 0 else "⚠️ 有鎖定項目")
     )
 
-    # ── 詳細結果 ──────────────────────────────────────────────
-    detailed_text = _format_detailed_section(features) if features else "⚠️ 找不到任何測試結果。"
-
-    # ── 本地報告路徑 ──────────────────────────────────────────
-    report_note = (
-        f"📁 {report_html_path}"
-        if report_file_ok
-        else f"⚠️ 找不到報告檔，預期路徑：{report_html_path}"
-    )
-
     # ── 郵件主旨 ──────────────────────────────────────────────
     status_icon = "✅" if summary["failed"] == 0 and summary["locked"] == 0 else "❌"
     subject = f"{status_icon} 官網自動化測試摘要 - 成功率: {success_rate:.0f}%"
 
-    body = f"""您好，今日自動化測試已執行完畢，報告摘要如下：
+    # ── 決定存檔路徑（時間戳 = 寄信當下）────────────────────────
+    history_dir = os.path.join(base_dir, "HistoryReports")
+    os.makedirs(history_dir, exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    archive_path = os.path.join(history_dir, f"Report_{stamp}.html")
 
-{_DIV}
-📋 測試環境資訊
-{_DIV}
-測試執行時間: {start_str} ~ {end_str}
-測試執行耗時: {elapsed:.2f} 秒
-測試裝置: {os_name} + Chrome (Headless)
-Chrome 版本: {chrome_ver}
-網路環境: {hostname} / {ip}
-測試框架: pytest + Selenium WebDriver
-報告工具: Allure
-測試狀態: {status_text}
+    # ── 產生 HTML 報告（路徑已含最新時間戳）─────────────────────
+    if features:
+        html_body, cid_images = _build_accordion_html(
+            features, summary, success_rate,
+            start_str, end_str, elapsed,
+            chrome_ver, hostname, ip, os_name, status_text,
+            results_path, archive_path, True,
+        )
+    else:
+        html_body  = "<p>⚠️ 找不到任何測試結果。</p>"
+        cid_images = []
 
-{_DIV}
-📊 測試統計
-{_DIV}
-總測試數: {summary['total']}
-通過測試: {summary['passed']}
-失敗測試: {summary['failed']}
-異常/跳過: {summary['locked']}
-成功率: {success_rate:.1f}%
+    _log(f"[send_report] 共嵌入 {len(cid_images)} 張截圖（CID inline）")
 
-{_DIV}
-📝 詳細測試結果
-{_DIV}
-{detailed_text}
+    # ── 存檔 ──────────────────────────────────────────────────
+    with open(archive_path, "w", encoding="utf-8") as _f:
+        _f.write(html_body)
+    _log(f"[send_report] 報告已存檔：HistoryReports\\Report_{stamp}.html")
 
-{report_note}
+    # ── 收集 Allure 附件 ──────────────────────────────────────
+    current_allure, historical_zip, hist_count = _collect_allure_attachments(base_dir)
 
-自動化機器人 敬上"""
-
-    msg = MIMEMultipart()
+    # ── 組裝 MIME：mixed 頂層（含附件），related 放 body + inline 截圖 ──
+    msg = MIMEMultipart("mixed")
     msg["From"]    = sender_email
     msg["To"]      = ", ".join(receivers)
     msg["Subject"] = Header(subject, "utf-8")
-    msg.attach(MIMEText(body, "plain", "utf-8"))
+
+    related = MIMEMultipart("related")
+    related.attach(MIMEText(html_body, "html", "utf-8"))
+    for cid, data in cid_images:
+        img_part = MIMEImage(data, _subtype="jpeg")
+        img_part.add_header("Content-ID", f"<{cid}>")
+        img_part.add_header("Content-Disposition", "inline")
+        related.attach(img_part)
+    msg.attach(related)
+
+    if current_allure and os.path.isfile(current_allure):
+        with open(current_allure, "rb") as f:
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(f.read())
+        encoders.encode_base64(part)
+        part.add_header("Content-Disposition", "attachment",
+                        filename=os.path.basename(current_allure))
+        msg.attach(part)
+        _log(f"[send_report] 附件：{os.path.basename(current_allure)}")
+
+    if historical_zip and os.path.isfile(historical_zip):
+        with open(historical_zip, "rb") as f:
+            part = MIMEBase("application", "zip")
+            part.set_payload(f.read())
+        encoders.encode_base64(part)
+        part.add_header("Content-Disposition", "attachment",
+                        filename="Allure_history_week.zip")
+        msg.attach(part)
+        _log(f"[send_report] 附件：Allure_history_week.zip（{hist_count} 個歷史報告）")
+        try:
+            os.remove(historical_zip)
+        except Exception:
+            pass
 
     try:
         server = smtplib.SMTP("smtp.gmail.com", 587)
@@ -368,7 +669,7 @@ Chrome 版本: {chrome_ver}
         server.login(sender_email, sender_password)
         server.send_message(msg)
         server.quit()
-        _log("[send_report] 摘要報告已成功寄出。")
+        _log("[send_report] HTML 報告已成功寄出。")
         masked = "、".join(_mask_email(r) for r in receivers)
         _log(f"   收件者：{masked}（若沒看到信，請查垃圾郵件匣）")
     except Exception as e:

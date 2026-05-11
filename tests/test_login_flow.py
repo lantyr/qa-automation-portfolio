@@ -46,6 +46,7 @@ class TestPasswordLogin:
         home = HomePage(driver)
         login = LoginPage(driver)
         account, password = get_pure_verified_credentials()
+        allure.dynamic.parameter("帳號", account)
 
         with allure.step("1. 前往首頁並點擊登入"):
             home.go_to_home()
@@ -54,7 +55,9 @@ class TestPasswordLogin:
 
         with allure.step("2. 以純點帳執行帳密登入"):
             login.login_action_pure(account, password)
-            WebDriverWait(driver, _TIMEOUT).until(EC.url_contains("beanfun.com"))
+            WebDriverWait(driver, _TIMEOUT).until(
+                EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+            )
             home.handle_alert()
             home.dismiss_blocking_overlays()
             _screenshot(driver, "步驟2_登入流程完成")

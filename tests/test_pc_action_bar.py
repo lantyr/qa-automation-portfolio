@@ -93,6 +93,7 @@ class TestPCActionBarDisplay:
         home = HomePage(driver)
         login = LoginPage(driver)
         account, password = get_pure_credentials()
+        allure.dynamic.parameter("帳號", account)
 
         with allure.step("1. 進入官網，點擊登入"):
             home.go_to_home()
@@ -104,7 +105,9 @@ class TestPCActionBarDisplay:
             _screenshot(driver, "步驟2_3_登入完成")
 
         with allure.step("4. 等待首頁載入並驗證導覽列"):
-            WebDriverWait(driver, 20).until(EC.url_contains("beanfun.com"))
+            WebDriverWait(driver, 20).until(
+                EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+            )
             home.handle_alert()
             home.dismiss_blocking_overlays()
             home.go_to_home()
@@ -120,16 +123,16 @@ class TestPCActionBarDisplay:
         # Test Title: 已登入顯示（GP點帳，含雲端背包）
         # Test Steps:
         #   1. 進入官網，點擊登入
-        #   2. GamaPass 帳密登入
-        #   3. 點擊「前往驗證」
-        #   4. 填入 OTP 並確認
-        #   5. 選取遊戲帳號並確認
-        #   6. 驗證導覽列顯示：登出、剩餘點數、會員中心、雲端背包、開通服務
+        #   2. GamaPass 帳密登入（含前往驗證）
+        #   3. 填入 OTP 並確認
+        #   4. 選取遊戲帳號並確認
+        #   5. 驗證導覽列顯示：登出、剩餘點數、會員中心、雲端背包、開通服務
         # Expected Result: GP點帳登入後導覽列元素完整顯示（含雲端背包）
 
         home = HomePage(driver)
         login = LoginPage(driver)
         account, password = get_gp_credentials()[0]
+        allure.dynamic.parameter("帳號", account)
         otp = get_beanfun_otp()
 
         with allure.step("1. 進入官網，點擊登入"):
@@ -137,33 +140,31 @@ class TestPCActionBarDisplay:
             home.click_login_btn()
             _screenshot(driver, "步驟1_點擊登入")
 
-        with allure.step("2. GamaPass 帳密登入"):
-            login.login_action(account, password, wait_for_verify=False)
-            _screenshot(driver, "步驟2_帳密完成")
+        with allure.step("2. GamaPass 帳密登入（含前往驗證）"):
+            login.login_action(account, password)
+            _screenshot(driver, "步驟2_帳密登入與前往驗證完成")
 
-        with allure.step("3. 點擊「前往驗證」"):
-            login.click_element_safely(login.GO_TO_VERIFY_BTN)
-            _screenshot(driver, "步驟3_前往驗證點擊")
-
-        with allure.step("4. 填入 OTP 並確認"):
+        with allure.step("3. 填入 OTP 並確認"):
             try:
                 login.fill_otp_code(otp)
             except Exception:
                 _screenshot(driver, "OTP驗證失敗")
                 pytest.skip("GP帳號 OTP 驗證頁未出現（簡訊上限或機器人攔截），請稍後重試")
             login.click_final_confirm()
-            _screenshot(driver, "步驟4_OTP完成")
+            _screenshot(driver, "步驟3_OTP完成")
 
-        with allure.step("5. 選取遊戲帳號並確認"):
+        with allure.step("4. 選取遊戲帳號並確認"):
             login.select_first_account_and_confirm()
-            _screenshot(driver, "步驟5_帳號選擇完成")
+            _screenshot(driver, "步驟4_帳號選擇完成")
 
-        with allure.step("6. 等待首頁載入並驗證導覽列"):
-            WebDriverWait(driver, 20).until(EC.url_contains("beanfun.com"))
+        with allure.step("5. 等待首頁載入並驗證導覽列"):
+            WebDriverWait(driver, 20).until(
+                EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+            )
             home.handle_alert()
             home.dismiss_blocking_overlays()
             home.go_to_home()
-            _screenshot(driver, "步驟6_GP點帳導覽列驗證")
+            _screenshot(driver, "步驟5_GP點帳導覽列驗證")
             home.assert_logged_in_navbar(has_bag=True)
 
     # ────────────────────────────────────────────────────────────
@@ -182,6 +183,7 @@ class TestPCActionBarDisplay:
         home = HomePage(driver)
         login = LoginPage(driver)
         account, password = get_star_credentials()
+        allure.dynamic.parameter("帳號", account)
         otp = get_beanfun_otp()
 
         with allure.step("1. 進入官網，點擊登入"):
@@ -196,7 +198,9 @@ class TestPCActionBarDisplay:
             _screenshot(driver, "步驟2_3_登入完成")
 
         with allure.step("4. 等待首頁載入並驗證導覽列"):
-            WebDriverWait(driver, 20).until(EC.url_contains("beanfun.com"))
+            WebDriverWait(driver, 20).until(
+                EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+            )
             home.handle_alert()
             home.dismiss_blocking_overlays()
             home.go_to_home()
@@ -252,6 +256,7 @@ class TestPCActionBarLoggedIn:
 
         if not TestPCActionBarLoggedIn._login_ok:
             account, password = require_beanfun_credentials()
+            allure.dynamic.parameter("帳號", account)
             otp = get_beanfun_otp()
             self.home.go_to_home()
             self.home.click_login_btn()
@@ -261,7 +266,9 @@ class TestPCActionBarLoggedIn:
             except Exception:
                 pytest.skip("beanfun OTP 驗證頁未出現，請等待數分鐘後重新執行")
             self.login.click_final_confirm()
-            WebDriverWait(class_driver, 20).until(EC.url_contains("beanfun.com"))
+            WebDriverWait(class_driver, 20).until(
+                EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+            )
             self.home.handle_alert()
             self.home.dismiss_blocking_overlays()
             TestPCActionBarLoggedIn._login_ok = True
@@ -269,6 +276,9 @@ class TestPCActionBarLoggedIn:
             self.driver.switch_to.default_content()
             self.home.go_to_home_if_needed()
             self.home.dismiss_blocking_overlays()
+            if not self.home.is_element_displayed(HomePage.LOGOUT_BTN, timeout=3):
+                TestPCActionBarLoggedIn._login_ok = False
+                pytest.skip("Session 已失效（dismiss_blocking_overlays 誤觸登出），請重新執行")
 
     # ────────────────────────────────────────────────────────────
     # TC-PC-AB-007
@@ -464,16 +474,18 @@ class TestPCActionBarGPAccount:
 
         if not TestPCActionBarGPAccount._login_ok:
             account, password = get_gp_credentials()[0]
+            allure.dynamic.parameter("帳號", account)
             otp = get_beanfun_otp()
             try:
                 self.home.go_to_home()
                 self.home.click_login_btn()
-                self.login.login_action(account, password, wait_for_verify=False)
-                self.login.click_element_safely(self.login.GO_TO_VERIFY_BTN)
+                self.login.login_action(account, password)
                 self.login.fill_otp_code(otp)
                 self.login.click_final_confirm()
                 self.login.select_first_account_and_confirm()
-                WebDriverWait(class_driver, _TIMEOUT).until(EC.url_contains("beanfun.com"))
+                WebDriverWait(class_driver, _TIMEOUT).until(
+                    EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+                )
                 self.home.handle_alert()
                 self.home.dismiss_blocking_overlays()
                 self.home.go_to_home()
@@ -484,6 +496,9 @@ class TestPCActionBarGPAccount:
             self.driver.switch_to.default_content()
             self.home.go_to_home_if_needed()
             self.home.dismiss_blocking_overlays()
+            if not self.home.is_element_displayed(HomePage.LOGOUT_BTN, timeout=3):
+                TestPCActionBarGPAccount._login_ok = False
+                pytest.skip("Session 已失效（dismiss_blocking_overlays 誤觸登出），請重新執行")
 
     # ────────────────────────────────────────────────────────────
     # TC-PC-AB-006

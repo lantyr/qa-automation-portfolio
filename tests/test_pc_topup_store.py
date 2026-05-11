@@ -98,6 +98,7 @@ class TestPCTopupStore:
 
         with allure.step("前置：登入 beanfun 帳號"):
             account, password = require_beanfun_credentials()
+            allure.dynamic.parameter("帳號", account)
             otp = get_beanfun_otp()
             self.home.go_to_home()
             self.home.click_login_btn()
@@ -110,7 +111,9 @@ class TestPCTopupStore:
                     "beanfun 偵測登入過於頻繁，OTP 驗證頁未出現，請等待數分鐘後重新執行"
                 )
             self.login.click_final_confirm()
-            WebDriverWait(self.driver, 20).until(EC.url_contains("beanfun.com"))
+            WebDriverWait(self.driver, 20).until(
+                EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+            )
             self.home.handle_alert()
             self.home.dismiss_blocking_overlays()
             self.home.go_to_home()
@@ -152,6 +155,7 @@ class TestPCTopupStore:
             self.home.go_to_home()
             if not self.home.is_element_displayed(self.home.LOGOUT_BTN, timeout=3):
                 account, password = require_beanfun_credentials()
+                allure.dynamic.parameter("帳號", account)
                 otp = get_beanfun_otp()
                 self.home.click_login_btn()
                 self.home.handle_alert()
@@ -161,7 +165,9 @@ class TestPCTopupStore:
                 except Exception:
                     pytest.skip("OTP 驗證頁未出現，請等待後重新執行")
                 self.login.click_final_confirm()
-                WebDriverWait(self.driver, 20).until(EC.url_contains("beanfun.com"))
+                WebDriverWait(self.driver, 20).until(
+                    EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+                )
                 self.home.handle_alert()
                 self.home.dismiss_blocking_overlays()
                 self.home.go_to_home()
@@ -221,6 +227,7 @@ class TestPCTopupStore:
             self.home.go_to_home()
             if not self.home.is_element_displayed(self.home.LOGOUT_BTN, timeout=3):
                 account, password = require_beanfun_credentials()
+                allure.dynamic.parameter("帳號", account)
                 otp = get_beanfun_otp()
                 self.home.click_login_btn()
                 self.home.handle_alert()
@@ -230,7 +237,9 @@ class TestPCTopupStore:
                 except Exception:
                     pytest.skip("OTP 驗證頁未出現，請等待後重新執行")
                 self.login.click_final_confirm()
-                WebDriverWait(self.driver, 20).until(EC.url_contains("beanfun.com"))
+                WebDriverWait(self.driver, 20).until(
+                    EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+                )
                 self.home.handle_alert()
                 self.home.dismiss_blocking_overlays()
                 self.home.go_to_home()
@@ -416,13 +425,16 @@ class TestPCTopupGeneralMember:
         self.topup = TopupPopupPage(self.driver)
         try:
             account, password = get_pure_credentials()
+            allure.dynamic.parameter("帳號", account)
         except ValueError as e:
             pytest.skip(str(e))
         try:
             self.home.go_to_home()
             self.home.click_login_btn()
             self.login.login_action_pure(account, password)
-            WebDriverWait(self.driver, 20).until(EC.url_contains("beanfun.com"))
+            WebDriverWait(self.driver, 20).until(
+                EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+            )
             self.home.handle_alert()
             self.home.dismiss_blocking_overlays()
             self.home.go_to_home()
@@ -535,13 +547,16 @@ class TestPCTopupSerialUnlocked:
         self.topup = TopupPopupPage(self.driver)
         try:
             account, password = get_pure_verified_credentials()
+            allure.dynamic.parameter("帳號", account)
         except ValueError as e:
             pytest.skip(str(e))
         try:
             self.home.go_to_home()
             self.home.click_login_btn()
             self.login.login_action_pure(account, password)
-            WebDriverWait(driver, 20).until(EC.url_contains("beanfun.com"))
+            WebDriverWait(driver, 20).until(
+                EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+            )
             self.home.handle_alert()
             self.home.dismiss_blocking_overlays()
             self.home.go_to_home()
@@ -589,11 +604,14 @@ class TestPCTopupPureVerifiedAccount:
         self.login = LoginPage(self.driver)
         self.topup = TopupPopupPage(self.driver)
         account, password = get_pure_verified_credentials()
+        allure.dynamic.parameter("帳號", account)
         try:
             self.home.go_to_home()
             self.home.click_login_btn()
             self.login.login_action_pure(account, password)
-            WebDriverWait(self.driver, 20).until(EC.url_contains("beanfun.com"))
+            WebDriverWait(self.driver, 20).until(
+                EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+            )
             self.home.handle_alert()
             self.home.dismiss_blocking_overlays()
             self.home.go_to_home()
@@ -677,7 +695,9 @@ class TestPCTopupGPAccount:
                     lambda d: len(d.window_handles) == 1
                 )
                 self.driver.switch_to.window(self.driver.window_handles[0])
-                WebDriverWait(self.driver, 20).until(EC.url_contains("beanfun.com"))
+                WebDriverWait(self.driver, 20).until(
+                    EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+                )
                 self.home.handle_alert()
                 self.home.dismiss_blocking_overlays()
                 self.home.go_to_home()
@@ -771,6 +791,7 @@ class TestPCTopupStarAccount:
         self.topup = TopupPopupPage(self.driver)
         try:
             account, password = get_star_credentials()
+            allure.dynamic.parameter("帳號", account)
         except ValueError as e:
             pytest.skip(str(e))
         otp = get_beanfun_otp()
@@ -780,7 +801,9 @@ class TestPCTopupStarAccount:
             self.login.login_action(account, password)
             self.login.fill_otp_code(otp)
             self.login.click_final_confirm()
-            WebDriverWait(self.driver, 20).until(EC.url_contains("beanfun.com"))
+            WebDriverWait(self.driver, 20).until(
+                EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+            )
             self.home.handle_alert()
             self.home.dismiss_blocking_overlays()
             self.home.go_to_home()
@@ -837,13 +860,16 @@ class TestPCTopupPureVerifiedSP001:
         self.topup = TopupPopupPage(self.driver)
         try:
             account, password = get_pure_verified_credentials()
+            allure.dynamic.parameter("帳號", account)
         except ValueError as e:
             pytest.skip(str(e))
         try:
             self.home.go_to_home()
             self.home.click_login_btn()
             self.login.login_action_pure(account, password)
-            WebDriverWait(self.driver, 20).until(EC.url_contains("beanfun.com"))
+            WebDriverWait(self.driver, 20).until(
+                EC.visibility_of_element_located(HomePage.LOGOUT_BTN)
+            )
             self.home.handle_alert()
             self.home.dismiss_blocking_overlays()
             self.home.go_to_home()
