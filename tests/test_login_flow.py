@@ -46,6 +46,7 @@ class TestPasswordLogin:
         home = HomePage(driver)
         login = LoginPage(driver)
         account, password = get_pure_verified_credentials()
+        allure.dynamic.parameter("帳號", account)
 
         with allure.step("1. 前往首頁並點擊登入"):
             home.go_to_home()

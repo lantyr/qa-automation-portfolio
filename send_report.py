@@ -5,13 +5,20 @@ import json
 import glob
 import re
 import base64
+import io
+import uuid
 import socket
 import platform
 import subprocess
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
+from email.mime.base import MIMEBase
 from email.header import Header
+from email import encoders
+import zipfile
+from PIL import Image
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -192,17 +199,73 @@ def _format_test_name(raw: str) -> str:
     return raw.replace("：", ": ")
 
 
-def _img_to_b64(path: str) -> str | None:
-    """PNG 檔案轉 base64 data URI，失敗回傳 None。"""
+def _compress_image_bytes(path: str, max_width: int = 950, quality: int = 95) -> bytes | None:
+    """PNG → 高品質 JPEG（q=85, 800px），三欄放大後仍清晰，用於 CID email 嵌入。"""
     try:
-        with open(path, "rb") as f:
-            return "data:image/png;base64," + base64.b64encode(f.read()).decode()
+        with Image.open(path) as img:
+            img = img.convert("RGB")
+            w, h = img.size
+            if w > max_width:
+                img = img.resize((max_width, int(h * max_width / w)), Image.LANCZOS)
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=quality, optimize=True)
+            return buf.getvalue()
     except Exception:
         return None
 
 
-def _steps_html(steps: list, results_dir: str, level: int = 0) -> str:
-    """遞迴將 Allure steps 轉成 HTML，並內嵌截圖（base64）。"""
+def _collect_screenshots_cid(
+    steps: list,
+    results_dir: str,
+    cid_images: list,
+) -> list[str]:
+    """遞迴收集 steps 所有截圖，壓縮後以 CID 儲存。
+    cid_images 為共用累積清單 [(cid, bytes)]，回傳本層的 cid 清單。
+    """
+    cids: list[str] = []
+    for step in steps:
+        for att in step.get("attachments", []):
+            if att.get("type") == "image/png":
+                data = _compress_image_bytes(os.path.join(results_dir, att["source"]))
+                if data:
+                    cid = uuid.uuid4().hex
+                    cid_images.append((cid, data))
+                    cids.append(cid)
+        sub = step.get("steps", [])
+        if sub:
+            cids.extend(_collect_screenshots_cid(sub, results_dir, cid_images))
+    return cids
+
+
+def _screenshots_grid_html(cids: list[str]) -> str:
+    """將 CID 清單渲染成兩欄縮圖格（可展開的 details）。"""
+    if not cids:
+        return ""
+    rows = []
+    for i in range(0, len(cids), 2):
+        row = cids[i:i + 2]
+        cells = "".join(
+            f'<td style="padding:3px;vertical-align:top;width:50%;">'
+            f'<img src="cid:{cid}" style="width:100%;border:1px solid #bbb;'
+            f'border-radius:3px;display:block;"></td>'
+            for cid in row
+        )
+        cells += '<td style="padding:3px;width:50%;"></td>' * (2 - len(row))
+        rows.append(f"<tr>{cells}</tr>")
+    rows_html = "\n".join(rows)
+    return (
+        f'<details style="margin:6px 10px;">'
+        f'<summary style="cursor:pointer;font-size:12px;color:#1565c0;'
+        f'background:#e3f2fd;padding:2px 8px;border-radius:3px;display:inline-block;">'
+        f'📸 截圖（{len(cids)} 張）</summary>'
+        f'<div style="margin-top:6px;">'
+        f'<table style="width:100%;border-collapse:collapse;">{rows_html}</table>'
+        f'</div></details>\n'
+    )
+
+
+def _steps_html(steps: list, level: int = 0) -> str:
+    """遞迴將 Allure steps 轉成 HTML 文字列表（截圖由外層統一收集顯示）。"""
     _STATUS_STYLE = {
         "passed":  ("✅", "#e8f5e9", "#2e7d32"),
         "failed":  ("❌", "#ffebee", "#c62828"),
@@ -219,33 +282,14 @@ def _steps_html(steps: list, results_dir: str, level: int = 0) -> str:
         name = re.sub(r"^步驟\s*\d+\s*:\s*", "", name)
         name = re.sub(r"^\d+\.\s*", "", name)
 
-        ss_html = ""
-        for att in step.get("attachments", []):
-            if att.get("type") == "image/png":
-                b64 = _img_to_b64(os.path.join(results_dir, att["source"]))
-                if b64:
-                    ss_html = (
-                        f'<details style="display:inline-block;vertical-align:top;margin-left:10px;">'
-                        f'<summary style="cursor:pointer;font-size:11px;color:#1565c0;'
-                        f'background:#e3f2fd;padding:1px 6px;border-radius:3px;">📸 截圖</summary>'
-                        f'<div style="margin-top:4px;">'
-                        f'<img src="{b64}" style="max-width:540px;border:1px solid #bbb;'
-                        f'border-radius:3px;display:block;"></div>'
-                        f'</details>'
-                    )
-                break
-
         html += (
             f'<div style="padding:4px 8px 4px {pad}px;background:{bg};'
             f'color:{fg};font-size:13px;border-bottom:1px solid rgba(0,0,0,0.05);">'
-            f'{icon} {i}. {name}{ss_html}'
-            f'</div>\n'
+            f'{icon} {i}. {name}</div>\n'
         )
-
         sub = step.get("steps", [])
         if sub:
-            html += _steps_html(sub, results_dir, level + 1)
-
+            html += _steps_html(sub, level + 1)
     return html
 
 
@@ -269,15 +313,15 @@ def _build_accordion_html(
     results_dir: str,
     report_path: str,
     report_file_ok: bool,
-) -> str:
-    """產生 HTML 手風琴測試報告（含 base64 內嵌截圖）。"""
+) -> tuple[str, list[tuple[str, bytes]]]:
+    """HTML 手風琴報告 + CID 截圖清單。回傳 (html, [(cid, bytes)])。"""
+    cid_images: list[tuple[str, bytes]] = []
 
     rate_color = (
         "#2e7d32" if success_rate >= 90
         else ("#f57f17" if success_rate >= 70 else "#c62828")
     )
 
-    # ── 頁首 + 環境資訊 ─────────────────────────────────────
     html = f"""<!DOCTYPE html>
 <html lang="zh-TW"><head><meta charset="utf-8">
 <style>
@@ -357,7 +401,6 @@ def _build_accordion_html(
 <h3 style="color:#1565c0;border-bottom:1px solid #bbdefb;padding-bottom:6px;">📝 詳細測試結果</h3>
 """
 
-    # ── 手風琴主體 ──────────────────────────────────────────
     ordered_feats = [f for f in _FEATURE_ORDER if f in features] + \
                     [f for f in features if f not in _FEATURE_ORDER]
 
@@ -439,7 +482,10 @@ def _build_accordion_html(
                 else:
                     steps = test.get("steps", [])
                     if steps:
-                        html += _steps_html(steps, results_dir)
+                        html += _steps_html(steps)
+                        cids = _collect_screenshots_cid(steps, results_dir, cid_images)
+                        if cids:
+                            html += _screenshots_grid_html(cids)
                     elif st != "passed" and msg:
                         escaped = msg.strip()[:400].replace("<", "&lt;").replace(">", "&gt;")
                         html += (
@@ -453,7 +499,6 @@ def _build_accordion_html(
 
         html += "  </div>\n</details>\n"
 
-    # ── 頁尾 ────────────────────────────────────────────────
     report_note = (
         f'📁 <code style="font-size:12px;color:#1565c0;">{report_path}</code>'
         if report_file_ok
@@ -469,7 +514,38 @@ def _build_accordion_html(
 
 </body></html>"""
 
-    return html
+    return html, cid_images
+
+
+def _collect_allure_attachments(base_dir: str) -> tuple[str | None, str | None, int]:
+    """Find current Allure HTML (most recent Allure_*.html) and ZIP historical ones from past 7 days.
+    Returns (current_path, zip_path, historical_count)."""
+    history_dir = os.path.join(base_dir, "HistoryReports")
+    if not os.path.isdir(history_dir):
+        return None, None, 0
+
+    allure_files = sorted(
+        glob.glob(os.path.join(history_dir, "Allure_*.html")),
+        reverse=True,
+    )
+    if not allure_files:
+        return None, None, 0
+
+    current = allure_files[0]
+    cutoff = datetime.now().timestamp() - 7 * 86400
+    historical = [
+        f for f in allure_files[1:]
+        if os.path.getmtime(f) >= cutoff
+    ]
+
+    zip_path = None
+    if historical:
+        zip_path = os.path.join(base_dir, "_allure_history_week.zip")
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for f in historical:
+                zf.write(f, os.path.basename(f))
+
+    return current, zip_path, len(historical)
 
 
 def send_email() -> None:
@@ -520,22 +596,72 @@ def send_email() -> None:
     status_icon = "✅" if summary["failed"] == 0 and summary["locked"] == 0 else "❌"
     subject = f"{status_icon} 官網自動化測試摘要 - 成功率: {success_rate:.0f}%"
 
-    # ── 產生 HTML 報告 ─────────────────────────────────────────
+    # ── 決定存檔路徑（時間戳 = 寄信當下）────────────────────────
+    history_dir = os.path.join(base_dir, "HistoryReports")
+    os.makedirs(history_dir, exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    archive_path = os.path.join(history_dir, f"Report_{stamp}.html")
+
+    # ── 產生 HTML 報告（路徑已含最新時間戳）─────────────────────
     if features:
-        html_body = _build_accordion_html(
+        html_body, cid_images = _build_accordion_html(
             features, summary, success_rate,
             start_str, end_str, elapsed,
             chrome_ver, hostname, ip, os_name, status_text,
-            results_path, report_html_path, report_file_ok,
+            results_path, archive_path, True,
         )
     else:
-        html_body = "<p>⚠️ 找不到任何測試結果。</p>"
+        html_body  = "<p>⚠️ 找不到任何測試結果。</p>"
+        cid_images = []
 
-    msg = MIMEMultipart()
+    _log(f"[send_report] 共嵌入 {len(cid_images)} 張截圖（CID inline）")
+
+    # ── 存檔 ──────────────────────────────────────────────────
+    with open(archive_path, "w", encoding="utf-8") as _f:
+        _f.write(html_body)
+    _log(f"[send_report] 報告已存檔：HistoryReports\\Report_{stamp}.html")
+
+    # ── 收集 Allure 附件 ──────────────────────────────────────
+    current_allure, historical_zip, hist_count = _collect_allure_attachments(base_dir)
+
+    # ── 組裝 MIME：mixed 頂層（含附件），related 放 body + inline 截圖 ──
+    msg = MIMEMultipart("mixed")
     msg["From"]    = sender_email
     msg["To"]      = ", ".join(receivers)
     msg["Subject"] = Header(subject, "utf-8")
-    msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+    related = MIMEMultipart("related")
+    related.attach(MIMEText(html_body, "html", "utf-8"))
+    for cid, data in cid_images:
+        img_part = MIMEImage(data, _subtype="jpeg")
+        img_part.add_header("Content-ID", f"<{cid}>")
+        img_part.add_header("Content-Disposition", "inline")
+        related.attach(img_part)
+    msg.attach(related)
+
+    if current_allure and os.path.isfile(current_allure):
+        with open(current_allure, "rb") as f:
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(f.read())
+        encoders.encode_base64(part)
+        part.add_header("Content-Disposition", "attachment",
+                        filename=os.path.basename(current_allure))
+        msg.attach(part)
+        _log(f"[send_report] 附件：{os.path.basename(current_allure)}")
+
+    if historical_zip and os.path.isfile(historical_zip):
+        with open(historical_zip, "rb") as f:
+            part = MIMEBase("application", "zip")
+            part.set_payload(f.read())
+        encoders.encode_base64(part)
+        part.add_header("Content-Disposition", "attachment",
+                        filename="Allure_history_week.zip")
+        msg.attach(part)
+        _log(f"[send_report] 附件：Allure_history_week.zip（{hist_count} 個歷史報告）")
+        try:
+            os.remove(historical_zip)
+        except Exception:
+            pass
 
     try:
         server = smtplib.SMTP("smtp.gmail.com", 587)

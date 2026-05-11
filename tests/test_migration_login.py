@@ -59,6 +59,7 @@ class TestGamaPassLogin:
         home = HomePage(driver)
         login = LoginPage(driver)
         account, password = get_gp_credentials()[0]
+        allure.dynamic.parameter("帳號", account)
         otp = get_beanfun_otp()
 
         with allure.step("1. 前往首頁並點擊登入"):
@@ -117,6 +118,7 @@ class TestGamaPassLogin:
         home = HomePage(driver)
         login = LoginPage(driver)
         account, password = get_star_credentials()
+        allure.dynamic.parameter("帳號", account)
         otp = get_beanfun_otp()
 
         with allure.step("1. 前往首頁並點擊登入"):

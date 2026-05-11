@@ -4,6 +4,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import UnexpectedAlertPresentException
 from .base_page import BasePage
 import pytest
+import random
 import time
 import allure
 
@@ -17,7 +18,8 @@ class LoginPage(BasePage):
     PWD_INPUT = (By.XPATH, "//input[@type='password']")
     LOGIN_FINAL_BTN = (By.XPATH, "//button[contains(., '登入')]")
     GO_TO_VERIFY_BTN = (By.XPATH, "//button[contains(., '前往驗證')] | //span[contains(text(), '前往驗證')]/..")
-    FINAL_CONFIRM_BTN = (By.XPATH, "//button[contains(., '確定')] | //span[contains(text(), '確定')]/..")
+    FINAL_CONFIRM_BTN = (By.XPATH,
+        "//button[contains(., '確定')] | //span[contains(text(), '確定')]/.. | //a[contains(@class,'ui-btn')]//span[text()='繼續']/..")
     
     # 驗證碼輸入框的定位器（支援 input-block 格式 及 簡訊OTP單格 maxlength=1 格式）
     OTP_INPUTS = (By.XPATH,
@@ -33,12 +35,19 @@ class LoginPage(BasePage):
     CONTINUE_BTN   = (By.XPATH, "//a[contains(@class,'ui-btn')]//span[text()='繼續']/..")
 
     # 帳號選擇步驟（GP點帳登入後可能出現）
-    ACCOUNT_RADIO_FIRST = (By.XPATH, "(//label[.//input[@type='radio' and @name='account']])[1]")
-    CONFIRM_BTN         = (By.XPATH, "//a[contains(@class,'ui-btn')]//span[text()='確認']/..")
+    ACCOUNT_RADIO_FIRST = (By.XPATH, "(//label[.//input[@type='radio']])[1]")
+    CONFIRM_BTN         = (By.XPATH, "//a[contains(@class,'ui-btn')]//span[text()='確認']/.. | //a[contains(@class,'ui-btn')]//span[text()='繼續']/..")
 
     # 「您的帳號尚未完成開通」彈窗確認按鈕
     NOT_ACTIVATED_BTN = (By.XPATH,
         "//button[contains(., '我知道了')] | //a[contains(., '我知道了')] | //span[text()='我知道了']/..")
+
+    # beanfun 登入頁「使用 Gama Pass」入口按鈕
+    USE_GAMAPASS_BTN = (By.CSS_SELECTOR, "a.use-gama-pass")
+
+    # OTP 送出 + gbox 彈窗確認（beanfun 簡訊OTP流程）
+    OTP_SUBMIT_BTN = (By.CSS_SELECTOR, "a.btn.btn-send-otp")
+    GBOX_CONFIRM_BTN = (By.CSS_SELECTOR, ".gbox-action a.gbox-btn")
 
     # 資料驗證-手機(6碼) 頁面指示文字
     PHONE_VERIFY_HINT = (By.XPATH,
@@ -72,7 +81,7 @@ class LoginPage(BasePage):
         except UnexpectedAlertPresentException:
             self._handle_captcha_alert()
         account_el.click()
-        account_el.send_keys(phone)
+        self._human_type(account_el, phone)
         btn_element = self.wait_until_visible(self.STEP1_BTN)
         self.driver.execute_script("arguments[0].click();", btn_element)
         self.wait_and_switch_window(old_handles)
@@ -85,16 +94,16 @@ class LoginPage(BasePage):
             self._handle_captcha_alert()
             phone_el = self.wait.until(EC.visibility_of_element_located(self.PHONE_INPUT))
         phone_el.click()
-        phone_el.send_keys(Keys.CONTROL, 'a')
-        phone_el.send_keys(phone)
-        
+        phone_el.send_keys(Keys.CONTROL + 'a')
+        self._human_type(phone_el, phone)
+
         next_btn = self.wait.until(EC.element_to_be_clickable(self.NEXT_BTN))
         self.driver.execute_script("arguments[0].click();", next_btn)
 
         print(f" [3/4] 正在填寫密碼...")
-        time.sleep(2)
         pwd_el = self.wait.until(EC.visibility_of_element_located(self.PWD_INPUT))
-        pwd_el.send_keys(password)
+        pwd_el.click()
+        self._human_type(pwd_el, password)
 
         handles_before_login = self.driver.window_handles
         login_btn = self.wait_until_visible(self.LOGIN_FINAL_BTN)
@@ -105,20 +114,29 @@ class LoginPage(BasePage):
         if not wait_for_verify:
             return
 
-        self.wait_and_switch_window(handles_before_login)
         print(" 正在等待前往驗證出現...")
+        # 先在目前視窗找（GamaPass message-box 彈窗形式）；找不到才切換新視窗
+        from selenium.webdriver.support.ui import WebDriverWait as _WDW
         try:
-            verify_btn = self.wait.until(EC.visibility_of_element_located(self.GO_TO_VERIFY_BTN))
+            verify_btn = _WDW(self.driver, 15, poll_frequency=0.5).until(
+                EC.visibility_of_element_located(self.GO_TO_VERIFY_BTN)
+            )
             self.driver.execute_script("arguments[0].click();", verify_btn)
             print(" 成功點擊前往驗證按鈕！")
         except Exception:
-            print(" 直接定位失敗，嘗試掃描 Iframe...")
-            if self.scan_iframes_and_click(self.GO_TO_VERIFY_BTN):
-                print(" 在 Iframe 中成功點擊前往驗證")
-            else:
-                print(" 窮盡所有方法仍找不到前往驗證按鈕")
-                allure.attach(self.driver.get_screenshot_as_png(), name="最後找不到按鈕的畫面", attachment_type=allure.attachment_type.PNG)
-                raise Exception("無法定位前往驗證按鈕")
+            self.wait_and_switch_window(handles_before_login)
+            try:
+                verify_btn = self.wait.until(EC.visibility_of_element_located(self.GO_TO_VERIFY_BTN))
+                self.driver.execute_script("arguments[0].click();", verify_btn)
+                print(" 在新視窗中成功點擊前往驗證按鈕！")
+            except Exception:
+                print(" 直接定位失敗，嘗試掃描 Iframe...")
+                if self.scan_iframes_and_click(self.GO_TO_VERIFY_BTN):
+                    print(" 在 Iframe 中成功點擊前往驗證")
+                else:
+                    print(" 窮盡所有方法仍找不到前往驗證按鈕")
+                    allure.attach(self.driver.get_screenshot_as_png(), name="最後找不到按鈕的畫面", attachment_type=allure.attachment_type.PNG)
+                    raise Exception("無法定位前往驗證按鈕")
 
     def select_first_account_and_confirm(self, timeout: int = 15) -> None:
         """
@@ -137,13 +155,17 @@ class LoginPage(BasePage):
                 continue
 
             # 主文件
+            _RADIO_SPAN = (By.XPATH, "(//label[.//input[@type='radio']]//span)[1]")
             self.driver.switch_to.default_content()
             try:
-                WebDriverWait(self.driver, timeout).until(
-                    EC_inner.element_to_be_clickable(self.ACCOUNT_RADIO_FIRST)
+                radio_span = WebDriverWait(self.driver, timeout).until(
+                    EC_inner.element_to_be_clickable(_RADIO_SPAN)
                 )
-                self.click_element_safely(self.ACCOUNT_RADIO_FIRST)
-                self.click_element_safely(self.CONFIRM_BTN)
+                radio_span.click()
+                confirm = WebDriverWait(self.driver, 5).until(
+                    EC_inner.element_to_be_clickable(self.CONFIRM_BTN)
+                )
+                confirm.click()
                 self.driver.switch_to.default_content()
                 return
             except Exception:
@@ -155,11 +177,14 @@ class LoginPage(BasePage):
                 try:
                     self.driver.switch_to.default_content()
                     self.driver.switch_to.frame(i)
-                    WebDriverWait(self.driver, 3).until(
-                        EC_inner.element_to_be_clickable(self.ACCOUNT_RADIO_FIRST)
+                    radio_span = WebDriverWait(self.driver, 3).until(
+                        EC_inner.element_to_be_clickable(_RADIO_SPAN)
                     )
-                    self.click_element_safely(self.ACCOUNT_RADIO_FIRST)
-                    self.click_element_safely(self.CONFIRM_BTN)
+                    radio_span.click()
+                    confirm = WebDriverWait(self.driver, 5).until(
+                        EC_inner.element_to_be_clickable(self.CONFIRM_BTN)
+                    )
+                    confirm.click()
                     self.driver.switch_to.default_content()
                     return
                 except Exception:
@@ -189,10 +214,10 @@ class LoginPage(BasePage):
         try:
             inputs = self.wait.until(EC.presence_of_all_elements_located(self.OTP_INPUTS))
             if len(inputs) in (4, 6):
-                for i, digit in enumerate(otp_code):
+                for i, digit in enumerate(otp_code[:len(inputs)]):
                     inputs[i].send_keys(digit)
                     time.sleep(0.2)
-                print(f" {len(otp_code)} 位數驗證碼填寫完成！")
+                print(f" {len(inputs)} 位數驗證碼填寫完成！")
             else:
                 print(f" 預期 4 或 6 個輸入格，但找到 {len(inputs)} 個")
         except Exception as e:
@@ -221,6 +246,20 @@ class LoginPage(BasePage):
             EC.visibility_of_element_located(SMS_OTP_TITLE)
         )
         print(" 已進入簡訊OTP驗證頁面")
+
+    def submit_otp_and_confirm(self, timeout: int = 15):
+        """OTP 填完後：點「確認」送出 → 等 gbox 彈窗 → 點彈窗「確認」。"""
+        from selenium.webdriver.support.ui import WebDriverWait as _WDW
+        _WDW(self.driver, timeout).until(
+            EC.element_to_be_clickable(self.OTP_SUBMIT_BTN)
+        ).click()
+        print(" 已點擊 OTP 確認送出")
+        # headless 模式下 gbox 彈窗可能延遲，加長等待並用 JS 點擊確保觸發
+        btn = _WDW(self.driver, timeout).until(
+            EC.element_to_be_clickable(self.GBOX_CONFIRM_BTN)
+        )
+        self.driver.execute_script("arguments[0].click();", btn)
+        print(" 已點擊 gbox 彈窗確認")
 
     def click_final_confirm(self):
         try:
@@ -312,6 +351,12 @@ class LoginPage(BasePage):
         self.driver.switch_to.window(new_handle)
         self.driver.maximize_window()
 
+    def _human_type(self, element, text: str) -> None:
+        """逐字輸入並附加隨機延遲以模擬人類打字，防止 GamaPass 機器人偵測機制觸發。"""
+        for char in text:
+            element.send_keys(char)
+            time.sleep(random.uniform(0.08, 0.25))
+
     def login_on_gamapass_window(self, phone, password):
         """
         在 GamaPass 視窗中完成帳密登入（不含 OTP / 前往驗證）。
@@ -320,11 +365,11 @@ class LoginPage(BasePage):
         phone_el = self.wait_until_visible(self.PHONE_INPUT)
         phone_el.click()
         phone_el.send_keys(Keys.CONTROL, 'a')
-        phone_el.send_keys(phone)
+        self._human_type(phone_el, phone)
 
         self.click_element_safely(self.NEXT_BTN)
 
         pwd_el = self.wait_until_visible(self.PWD_INPUT)
-        pwd_el.send_keys(password)
+        self._human_type(pwd_el, password)
 
         self.click_element_safely(self.LOGIN_FINAL_BTN)

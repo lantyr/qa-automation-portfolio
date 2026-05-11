@@ -98,6 +98,7 @@ class TestPCTopupStore:
 
         with allure.step("前置：登入 beanfun 帳號"):
             account, password = require_beanfun_credentials()
+            allure.dynamic.parameter("帳號", account)
             otp = get_beanfun_otp()
             self.home.go_to_home()
             self.home.click_login_btn()
@@ -154,6 +155,7 @@ class TestPCTopupStore:
             self.home.go_to_home()
             if not self.home.is_element_displayed(self.home.LOGOUT_BTN, timeout=3):
                 account, password = require_beanfun_credentials()
+                allure.dynamic.parameter("帳號", account)
                 otp = get_beanfun_otp()
                 self.home.click_login_btn()
                 self.home.handle_alert()
@@ -225,6 +227,7 @@ class TestPCTopupStore:
             self.home.go_to_home()
             if not self.home.is_element_displayed(self.home.LOGOUT_BTN, timeout=3):
                 account, password = require_beanfun_credentials()
+                allure.dynamic.parameter("帳號", account)
                 otp = get_beanfun_otp()
                 self.home.click_login_btn()
                 self.home.handle_alert()
@@ -422,6 +425,7 @@ class TestPCTopupGeneralMember:
         self.topup = TopupPopupPage(self.driver)
         try:
             account, password = get_pure_credentials()
+            allure.dynamic.parameter("帳號", account)
         except ValueError as e:
             pytest.skip(str(e))
         try:
@@ -543,6 +547,7 @@ class TestPCTopupSerialUnlocked:
         self.topup = TopupPopupPage(self.driver)
         try:
             account, password = get_pure_verified_credentials()
+            allure.dynamic.parameter("帳號", account)
         except ValueError as e:
             pytest.skip(str(e))
         try:
@@ -599,6 +604,7 @@ class TestPCTopupPureVerifiedAccount:
         self.login = LoginPage(self.driver)
         self.topup = TopupPopupPage(self.driver)
         account, password = get_pure_verified_credentials()
+        allure.dynamic.parameter("帳號", account)
         try:
             self.home.go_to_home()
             self.home.click_login_btn()
@@ -785,6 +791,7 @@ class TestPCTopupStarAccount:
         self.topup = TopupPopupPage(self.driver)
         try:
             account, password = get_star_credentials()
+            allure.dynamic.parameter("帳號", account)
         except ValueError as e:
             pytest.skip(str(e))
         otp = get_beanfun_otp()
@@ -853,6 +860,7 @@ class TestPCTopupPureVerifiedSP001:
         self.topup = TopupPopupPage(self.driver)
         try:
             account, password = get_pure_verified_credentials()
+            allure.dynamic.parameter("帳號", account)
         except ValueError as e:
             pytest.skip(str(e))
         try:

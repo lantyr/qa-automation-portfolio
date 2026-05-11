@@ -31,6 +31,7 @@ def _screenshot(driver, name: str) -> None:
 def _login_gp(home, login):
     """GP帳登入流程（含 OTP + 選帳號）。"""
     account, password = get_gp_credentials()[0]
+    allure.dynamic.parameter("帳號", account)
     otp = get_beanfun_otp()
     home.go_to_home()
     home.click_login_btn()
@@ -55,6 +56,7 @@ def _login_gp(home, login):
 def _login_star(home, login):
     """星帳登入流程（含 OTP + 選帳號）。"""
     account, password = get_star_credentials()
+    allure.dynamic.parameter("帳號", account)
     otp = get_beanfun_otp()
     home.go_to_home()
     home.click_login_btn()
