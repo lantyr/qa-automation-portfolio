@@ -199,8 +199,9 @@ def _format_test_name(raw: str) -> str:
     return raw.replace("：", ": ")
 
 
-def _compress_image_bytes(path: str, max_width: int = 950, quality: int = 95) -> bytes | None:
-    """PNG → 高品質 JPEG（q=85, 800px），三欄放大後仍清晰，用於 CID email 嵌入。"""
+_IMG_MAX_BYTES = 70_000  # 70 KB hard cap per image to stay under Gmail 25 MB limit
+
+def _compress_image_bytes(path: str, max_width: int = 600, quality: int = 60) -> bytes | None:
     try:
         with Image.open(path) as img:
             img = img.convert("RGB")
@@ -209,7 +210,17 @@ def _compress_image_bytes(path: str, max_width: int = 950, quality: int = 95) ->
                 img = img.resize((max_width, int(h * max_width / w)), Image.LANCZOS)
             buf = io.BytesIO()
             img.save(buf, format="JPEG", quality=quality, optimize=True)
-            return buf.getvalue()
+            data = buf.getvalue()
+        if len(data) > _IMG_MAX_BYTES:
+            with Image.open(path) as img:
+                img = img.convert("RGB")
+                w, h = img.size
+                w2 = min(w, 450)
+                img = img.resize((w2, int(h * w2 / w)), Image.LANCZOS)
+                buf = io.BytesIO()
+                img.save(buf, format="JPEG", quality=45, optimize=True)
+                data = buf.getvalue()
+        return data
     except Exception:
         return None
 
