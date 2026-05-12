@@ -324,6 +324,7 @@ def _build_accordion_html(
     results_dir: str,
     report_path: str,
     report_file_ok: bool,
+    drive_link: str | None = None,
 ) -> tuple[str, list[tuple[str, bytes]]]:
     """HTML 手風琴報告 + CID 截圖清單。回傳 (html, [(cid, bytes)])。"""
     cid_images: list[tuple[str, bytes]] = []
@@ -513,22 +514,63 @@ def _build_accordion_html(
 
         html += "  </div>\n</details>\n"
 
-    report_note = (
-        f'📁 <code style="font-size:12px;color:#1565c0;">{report_path}</code>'
-        if report_file_ok
-        else f'⚠️ 找不到報告檔，預期路徑：<code style="font-size:12px;">{report_path}</code>'
-    )
+    drive_btn = ""
+    if drive_link:
+        drive_btn = (
+            f'<p style="margin-top:16px;text-align:center;">'
+            f'<a href="{drive_link}" target="_blank" '
+            f'style="display:inline-block;padding:10px 24px;background:#1565c0;color:white;'
+            f'text-decoration:none;border-radius:5px;font-size:14px;font-weight:bold;">'
+            f'📊 查看完整 Allure 報告</a></p>\n'
+        )
 
     html += f"""
+{drive_btn}
 <p style="margin-top:24px;color:#999;font-size:12px;
           border-top:1px solid #eee;padding-top:12px;line-height:1.8;">
-  {report_note}<br>
   自動化機器人 敬上
 </p>
 
 </body></html>"""
 
     return html, cid_images
+
+
+_GDRIVE_TOKEN   = os.path.join(os.path.dirname(os.path.abspath(__file__)), "credentials", "gdrive_token.json")
+_GDRIVE_SCOPES  = ["https://www.googleapis.com/auth/drive.file"]
+
+
+def _upload_report_to_drive(report_path: str) -> str | None:
+    folder_id = (os.getenv("GDRIVE_FOLDER_ID") or "").strip()
+    if not folder_id:
+        return None
+    if not os.path.isfile(_GDRIVE_TOKEN):
+        _log("[send_report] Drive: 找不到 gdrive_token.json，請先執行 gdrive_auth.py")
+        return None
+    try:
+        from google.oauth2.credentials import Credentials
+        from google.auth.transport.requests import Request
+        from googleapiclient.discovery import build
+        from googleapiclient.http import MediaFileUpload
+        creds = Credentials.from_authorized_user_file(_GDRIVE_TOKEN, _GDRIVE_SCOPES)
+        if creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+            with open(_GDRIVE_TOKEN, "w") as f:
+                f.write(creds.to_json())
+        service = build("drive", "v3", credentials=creds, cache_discovery=False)
+        size_mb = os.path.getsize(report_path) // 1024 // 1024
+        _log(f"[send_report] 正在上傳 Allure 報告到 Drive（{size_mb} MB）...")
+        file_meta = {"name": os.path.basename(report_path), "parents": [folder_id]}
+        media = MediaFileUpload(report_path, mimetype="text/html", resumable=True)
+        f = service.files().create(body=file_meta, media_body=media, fields="id,webViewLink").execute()
+        service.permissions().create(
+            fileId=f["id"], body={"type": "anyone", "role": "reader"}
+        ).execute()
+        _log(f"[send_report] Drive 上傳完成：{f['webViewLink']}")
+        return f["webViewLink"]
+    except Exception as e:
+        _log(f"[send_report] Drive 上傳失敗：{e}")
+        return None
 
 
 def _collect_allure_attachments(base_dir: str) -> tuple[str | None, str | None, int]:
@@ -616,6 +658,9 @@ def send_email() -> None:
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     archive_path = os.path.join(history_dir, f"EmailReport_{stamp}.html")
 
+    # ── 上傳 Allure 報告到 Google Drive ──────────────────────────
+    drive_link = _upload_report_to_drive(report_html_path) if report_file_ok else None
+
     # ── 產生 HTML 報告（路徑已含最新時間戳）─────────────────────
     if features:
         html_body, cid_images = _build_accordion_html(
@@ -623,6 +668,7 @@ def send_email() -> None:
             start_str, end_str, elapsed,
             chrome_ver, hostname, ip, os_name, status_text,
             results_path, archive_path, True,
+            drive_link=drive_link,
         )
     else:
         html_body  = "<p>⚠️ 找不到任何測試結果。</p>"
