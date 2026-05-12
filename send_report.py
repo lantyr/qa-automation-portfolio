@@ -614,7 +614,7 @@ def send_email() -> None:
     history_dir = os.path.join(base_dir, "HistoryReports")
     os.makedirs(history_dir, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    archive_path = os.path.join(history_dir, f"Report_{stamp}.html")
+    archive_path = os.path.join(history_dir, f"EmailReport_{stamp}.html")
 
     # ── 產生 HTML 報告（路徑已含最新時間戳）─────────────────────
     if features:
@@ -633,7 +633,7 @@ def send_email() -> None:
     # ── 存檔 ──────────────────────────────────────────────────
     with open(archive_path, "w", encoding="utf-8") as _f:
         _f.write(html_body)
-    _log(f"[send_report] 報告已存檔：HistoryReports\\Report_{stamp}.html")
+    _log(f"[send_report] 報告已存檔：HistoryReports\\EmailReport_{stamp}.html")
 
     # ── 收集 Allure 附件 ──────────────────────────────────────
     current_allure, historical_zip, hist_count = _collect_allure_attachments(base_dir)
