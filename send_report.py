@@ -325,6 +325,7 @@ def _build_accordion_html(
     report_path: str,
     report_file_ok: bool,
     drive_link: str | None = None,
+    trend_history: list[dict] | None = None,
 ) -> tuple[str, list[tuple[str, bytes]]]:
     """HTML 手風琴報告 + CID 截圖清單。回傳 (html, [(cid, bytes)])。"""
     cid_images: list[tuple[str, bytes]] = []
@@ -410,6 +411,7 @@ def _build_accordion_html(
   </tr>
 </table>
 
+{_build_trend_html(trend_history or [])}
 <h3 style="color:#1565c0;border-bottom:1px solid #bbdefb;padding-bottom:6px;">📝 詳細測試結果</h3>
 """
 
@@ -534,6 +536,77 @@ def _build_accordion_html(
 </body></html>"""
 
     return html, cid_images
+
+
+_TREND_LOG  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "HistoryReports", "trend_log.json")
+_TREND_MAX  = 14  # 最多保留幾次歷史
+
+
+def _append_trend(summary: dict, success_rate: float, start_str: str) -> list[dict]:
+    """把本次統計 append 進 trend_log.json，回傳最近 N 筆。"""
+    entry = {
+        "date":   start_str[:16],
+        "total":  summary["total"],
+        "passed": summary["passed"],
+        "failed": summary["failed"],
+        "locked": summary["locked"],
+        "rate":   round(success_rate, 1),
+    }
+    history: list[dict] = []
+    if os.path.isfile(_TREND_LOG):
+        try:
+            with open(_TREND_LOG, "r", encoding="utf-8") as f:
+                history = json.load(f)
+        except Exception:
+            history = []
+    history.append(entry)
+    history = history[-_TREND_MAX:]
+    try:
+        os.makedirs(os.path.dirname(_TREND_LOG), exist_ok=True)
+        with open(_TREND_LOG, "w", encoding="utf-8") as f:
+            json.dump(history, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        _log(f"[send_report] 趨勢日誌寫入失敗：{e}")
+    return history
+
+
+def _build_trend_html(history: list[dict]) -> str:
+    """渲染帶日期的歷史趨勢表格，少於 2 筆時不顯示。"""
+    if len(history) < 2:
+        return ""
+    rows = ""
+    latest_date = history[-1].get("date", "")
+    for entry in reversed(history):
+        rate    = entry.get("rate", 0.0)
+        color   = "#2e7d32" if rate >= 90 else ("#f57f17" if rate >= 70 else "#c62828")
+        row_bg  = "background:#e3f2fd;" if entry.get("date") == latest_date else ""
+        rows += (
+            f'<tr style="{row_bg}">'
+            f'<td style="padding:6px 10px;border-bottom:1px solid #eee;">{entry.get("date","")}</td>'
+            f'<td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center;">{entry["total"]}</td>'
+            f'<td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center;color:#2e7d32;">✅ {entry["passed"]}</td>'
+            f'<td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center;color:#c62828;">❌ {entry["failed"]}</td>'
+            f'<td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center;color:#f57f17;">⚠️ {entry["locked"]}</td>'
+            f'<td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center;'
+            f'font-weight:bold;color:{color};">{rate:.1f}%</td>'
+            f'</tr>\n'
+        )
+    return (
+        f'<h3 style="color:#1565c0;border-bottom:1px solid #bbdefb;padding-bottom:6px;">'
+        f'📈 歷史趨勢（最近 {len(history)} 次）</h3>\n'
+        f'<table style="width:100%;border-collapse:collapse;margin-bottom:20px;'
+        f'border:1px solid #e0e0e0;font-size:13px;">\n'
+        f'  <tr style="background:#1565c0;color:white;">\n'
+        f'    <th style="padding:8px 10px;text-align:left;">執行時間</th>\n'
+        f'    <th style="padding:8px 10px;text-align:center;">總數</th>\n'
+        f'    <th style="padding:8px 10px;text-align:center;">通過</th>\n'
+        f'    <th style="padding:8px 10px;text-align:center;">失敗</th>\n'
+        f'    <th style="padding:8px 10px;text-align:center;">跳過</th>\n'
+        f'    <th style="padding:8px 10px;text-align:center;">成功率</th>\n'
+        f'  </tr>\n'
+        f'{rows}'
+        f'</table>\n'
+    )
 
 
 _GDRIVE_TOKEN   = os.path.join(os.path.dirname(os.path.abspath(__file__)), "credentials", "gdrive_token.json")
@@ -661,6 +734,10 @@ def send_email() -> None:
     # ── 上傳 Allure 報告到 Google Drive ──────────────────────────
     drive_link = _upload_report_to_drive(report_html_path) if report_file_ok else None
 
+    # ── 寫入趨勢日誌 ─────────────────────────────────────────────
+    trend_history = _append_trend(summary, success_rate, start_str)
+    _log(f"[send_report] 趨勢日誌已更新（共 {len(trend_history)} 筆）")
+
     # ── 產生 HTML 報告（路徑已含最新時間戳）─────────────────────
     if features:
         html_body, cid_images = _build_accordion_html(
@@ -669,6 +746,7 @@ def send_email() -> None:
             chrome_ver, hostname, ip, os_name, status_text,
             results_path, archive_path, True,
             drive_link=drive_link,
+            trend_history=trend_history,
         )
     else:
         html_body  = "<p>⚠️ 找不到任何測試結果。</p>"

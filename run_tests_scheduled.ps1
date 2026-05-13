@@ -98,6 +98,10 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
+# [3b/7] patch history-trend.json with reportName = date
+Append-Log '[3b/7] patch trend dates'
+& $py (Join-Path $root 'patch_trend_dates.py') 2>&1 | ForEach-Object { Append-Log $_ }
+
 # [4/7] allure-combine
 Append-Log '[4/7] allure-combine'
 $reportDir = Join-Path $root 'allure-report'
