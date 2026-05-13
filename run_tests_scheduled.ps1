@@ -135,6 +135,10 @@ if (-not $combined) {
     Append-Log 'WARNING: allure-combine failed. pip install allure-combine in venv.'
 }
 
+# [4b/7] inject trend table into complete.html
+Append-Log '[4b/7] inject trend table'
+& $py (Join-Path $root 'inject_trend_table.py') 2>&1 | ForEach-Object { Append-Log $_ }
+
 # [5/7] Archive complete.html to HistoryReports
 Append-Log '[5/7] archive complete.html'
 $histReports = Join-Path $root 'HistoryReports'
