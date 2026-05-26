@@ -1,0 +1,18 @@
+{
+  "valid_register": {
+    "email": "eve.holt@reqres.in",
+    "password": "pistol"
+  },
+  "valid_login": {
+    "email": "eve.holt@reqres.in",
+    "password": "cityslicka"
+  },
+  "missing_password": {
+    "email": "sydney@fife"
+  },
+  "checkout_info": {
+    "first_name": "Ada",
+    "last_name": "Lovelace",
+    "postal_code": "10001"
+  }
+}
