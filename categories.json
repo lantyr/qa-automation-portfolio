@@ -1,0 +1,20 @@
+[
+  {
+    "name": "Environment Constraints",
+    "matchedStatuses": ["skipped"],
+    "messageRegex": ".*"
+  },
+  {
+    "name": "Infrastructure Issues",
+    "matchedStatuses": ["broken"],
+    "traceRegex": ".*(TimeoutError|WebDriverException|ConnectionRefusedError|NetworkError|playwright\\._impl).*"
+  },
+  {
+    "name": "Product Defects",
+    "matchedStatuses": ["failed"]
+  },
+  {
+    "name": "Test Defects",
+    "matchedStatuses": ["broken"]
+  }
+]

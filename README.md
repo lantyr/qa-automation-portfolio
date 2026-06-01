@@ -87,46 +87,57 @@
 
 ```
 qa-automation-portfolio/
-├── mobile_pack/                  # 📱 Mobile 模組（Selenium）
-│   ├── pages/                    # POM：行動版頁面物件
-│   │   ├── base_page.py          # 共用等待 / 安全點擊封裝
+├── mobile_pack/                      # 📱 Mobile 模組（Selenium）
+│   ├── pages/                        # POM：行動版頁面物件
+│   │   ├── base_page.py              # 共用 WebDriverWait 動態等待封裝
+│   │   ├── login_page.py
+│   │   ├── inventory_page.py         # 含漢堡選單開關操作
+│   │   └── checkout_page.py          # CartPage / CheckoutPage / CheckoutCompletePage
+│   ├── tests/
+│   │   ├── api/                      # API 層（預留）
+│   │   └── ui/                       # Selenium iPhone X Emulation 測試
+│   │       ├── test_login.py         # M-LOG-001/002/003
+│   │       ├── test_inventory.py     # M-INV-001/002
+│   │       └── test_checkout.py      # M-CHK-001/002、M-NAV-001
+│   └── conftest.py                   # mobile_driver fixture、自動失敗截圖
+│
+├── web_pack/                         # 🖥️ PC 版模組（Playwright）
+│   ├── pages/                        # POM：桌面版頁面物件
+│   │   ├── base_page.py              # 共用 Playwright 動態等待封裝
 │   │   ├── login_page.py
 │   │   ├── inventory_page.py
-│   │   └── checkout_page.py
+│   │   └── checkout_page.py          # CartPage / CheckoutPage / CheckoutCompletePage
 │   ├── tests/
-│   │   ├── api/                  # API 層測試（requests）
-│   │   └── ui/                   # UI 層測試（Selenium mobile emulation）
-│   └── conftest.py               # mobile_driver fixture、自動失敗截圖
+│   │   ├── api/                      # API 層測試（reqres.in）
+│   │   │   ├── test_users.py         # USR-001/002/003/004
+│   │   │   ├── test_auth.py          # AUT-001/002/003/004
+│   │   │   └── test_robustness.py    # RBS-001/002/003/004
+│   │   └── ui/                       # Playwright Chromium 測試
+│   │       ├── test_login.py         # UI-LOG-001/002/003
+│   │       ├── test_inventory.py     # UI-INV-001/002/003
+│   │       └── test_checkout.py      # UI-CHK-001/002
+│   └── conftest.py                   # driver / reqres fixture、自動截圖 hook
 │
-├── web_pack/                     # 🖥️ PC 版模組（Playwright）
-│   ├── pages/                    # POM：桌面版頁面物件
-│   │   ├── base_page.py
-│   │   ├── login_page.py
-│   │   ├── inventory_page.py
-│   │   └── checkout_page.py
-│   ├── tests/
-│   │   ├── api/                  # API 層測試（reqres.in）
-│   │   └── ui/                   # UI 層測試（Playwright Chromium）
-│   └── conftest.py               # playwright fixture、自動截圖 hook
-│
-├── utils/                        # 共用工具
-│   ├── api_session.py            # 從瀏覽器 cookies 建立 requests session
+├── utils/                            # 共用工具
+│   ├── api_session.py                # 從 Playwright cookies 建立 requests session
 │   └── report/
-│       ├── send_report.py        # HTML Email 報告產生與寄送
-│       ├── inject_trend_table.py # 跨執行歷史趨勢表注入
-│       └── patch_trend_dates.py  # Allure 趨勢圖日期修補
+│       ├── send_report.py            # HTML Email 報告產生、Drive 上傳、Slack 推播
+│       ├── inject_trend_table.py     # 跨執行歷史趨勢表（rolling 30 筆）
+│       ├── patch_trend_dates.py      # Allure 趨勢圖 epoch 時間戳修補
+│       └── gdrive_auth.py            # Google Drive 一次性 OAuth2 授權
 │
-├── config/                       # 環境設定
-│   ├── settings.py               # frozen dataclass，唯一設定來源
-│   └── credentials.py            # .env 憑證讀取封裝
+├── config/                           # 環境設定
+│   ├── settings.py                   # frozen dataclass，唯一設定來源
+│   └── credentials.py                # .env 通知憑證讀取封裝
 │
-├── data/                         # 外部測試資料（JSON）
-├── categories.json               # Allure 分類規則（環境限制 vs 真實 Bug）
-├── run_tests_scheduled.ps1       # 排程腳本（測試 → Allure → 報告 → 通知）
-├── .github/workflows/ci.yml      # GitHub Actions CI
+├── data/                             # 外部測試資料（JSON）
+│   └── users.json                    # 帳號、結帳資訊（無硬編碼）
+├── categories.json                   # Allure 四層分類規則
+├── run_tests_scheduled.ps1           # 排程腳本（測試 → Allure → 報告 → 通知）
+├── .github/workflows/ci.yml          # GitHub Actions CI
 ├── pytest.ini
 ├── requirements.txt
-└── .env.example                  # 環境變數樣板（無任何密碼）
+└── .env.example                      # 環境變數樣板（無任何密碼）
 ```
 
 ---

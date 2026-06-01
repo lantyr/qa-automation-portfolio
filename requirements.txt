@@ -3,6 +3,10 @@ pytest-xdist==3.6.1
 pytest-rerunfailures==15.0
 allure-pytest==2.13.5
 playwright>=1.40.0
+selenium>=4.18.0
 requests==2.32.3
 python-dotenv==1.0.1
 jsonschema==4.23.0
+google-auth>=2.0.0
+google-auth-oauthlib>=1.0.0
+google-api-python-client>=2.0.0
