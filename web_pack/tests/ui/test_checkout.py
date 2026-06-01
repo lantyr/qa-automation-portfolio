@@ -9,9 +9,9 @@ import allure
 import pytest
 
 from config.settings import settings
-from web_pack.pages.login_page import LoginPage
+from web_pack.pages.checkout_page import CartPage, CheckoutCompletePage, CheckoutPage
 from web_pack.pages.inventory_page import InventoryPage
-from web_pack.pages.checkout_page import CartPage, CheckoutPage, CheckoutCompletePage
+from web_pack.pages.login_page import LoginPage
 
 CHECKOUT_INFO = json.loads(
     (Path(__file__).resolve().parents[3] / "data" / "users.json").read_text()

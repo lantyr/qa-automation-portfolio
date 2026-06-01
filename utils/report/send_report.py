@@ -23,9 +23,13 @@ ALLURE_RESULTS = ROOT / "allure-results"
 ALLURE_REPORT = ROOT / "allure-report"
 
 sys.path.insert(0, str(ROOT))
-from config.credentials import credentials
-from utils.report.inject_trend_table import append_run, build_trend_html, inject_into_html
-
+from config.credentials import credentials  # noqa: E402
+from utils.report.inject_trend_table import (  # noqa: E402
+    append_run,
+    build_trend_html,
+    inject_into_html,
+    load_trend,
+)
 
 # ---------------------------------------------------------------------------
 # Data loading
@@ -157,6 +161,7 @@ def _upload_to_drive() -> str:
     try:
         import tempfile
         import zipfile
+
         from google.oauth2.credentials import Credentials as GCreds
         from googleapiclient.discovery import build
         from googleapiclient.http import MediaFileUpload
@@ -274,8 +279,6 @@ def main() -> None:
     drive_link = "" if args.preview else _upload_to_drive()
     html_body = _build_html(summary, results, drive_link)
 
-    trend = build_trend_html([])
-    from utils.report.inject_trend_table import load_trend
     append_run(summary)
     trend_html = build_trend_html(load_trend())
     html_body = inject_into_html(html_body, trend_html)

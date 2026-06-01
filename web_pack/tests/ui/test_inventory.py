@@ -6,8 +6,8 @@ import allure
 import pytest
 
 from config.settings import settings
-from web_pack.pages.login_page import LoginPage
 from web_pack.pages.inventory_page import InventoryPage
+from web_pack.pages.login_page import LoginPage
 
 
 @pytest.fixture

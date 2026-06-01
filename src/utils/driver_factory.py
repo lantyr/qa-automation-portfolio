@@ -1,4 +1,4 @@
-from playwright.sync_api import sync_playwright, Page, Browser, Playwright
+from playwright.sync_api import Browser, Page, Playwright, sync_playwright
 
 
 def build_chrome(headless: bool = True) -> tuple[Playwright, Browser, Page]:
